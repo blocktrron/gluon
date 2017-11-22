@@ -1,0 +1,79 @@
+From e8fbdedbeeeab19faf0d367d8d9115564c82c627 Mon Sep 17 00:00:00 2001
+From: Henryk Heisig <hyniu@o2.pl>
+Date: Thu, 29 Jun 2017 15:20:31 +0200
+Subject: [PATCH] ar71xx: Archer C58/C59/C60 fix qca9886 wireless interface
+
+This commit fix 5GHz wireless interface used in Archer C58/C59/C60v1
+and set correctly MAC address on this interface.
+
+Signed-off-by: Henryk Heisig <hyniu@o2.pl>
+---
+ .../ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata      | 4 +++-
+ .../linux/ar71xx/base-files/etc/hotplug.d/ieee80211/10_fix_wifi_mac | 4 +++-
+ target/linux/ar71xx/image/tp-link.mk                                | 6 +++---
+ 3 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata b/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
+index 04d8bcca53..669b8d3387 100644
+--- a/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
++++ b/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
+@@ -132,7 +132,9 @@ case "$FIRMWARE" in
+ 	;;
+ "ath10k/pre-cal-pci-0000:00:00.0.bin")
+ 	case $board in
+-	archer-c58-v1)
++	archer-c58-v1|\
++	archer-c59-v1|\
++	archer-c60-v1)
+ 		ath10kcal_extract "art" 20480 12064
+ 		;;
+ 	esac
+diff --git a/target/linux/ar71xx/base-files/etc/hotplug.d/ieee80211/10_fix_wifi_mac b/target/linux/ar71xx/base-files/etc/hotplug.d/ieee80211/10_fix_wifi_mac
+index 7d2eca546d..669b208231 100644
+--- a/target/linux/ar71xx/base-files/etc/hotplug.d/ieee80211/10_fix_wifi_mac
++++ b/target/linux/ar71xx/base-files/etc/hotplug.d/ieee80211/10_fix_wifi_mac
+@@ -12,7 +12,9 @@ PHYNBR=${DEVPATH##*/phy}
+ board=$(ar71xx_board_name)
+ 
+ case "$board" in
+-	archer-c58-v1)
++	archer-c58-v1|\
++	archer-c59-v1|\
++	archer-c60-v1)
+ 		echo $(macaddr_add $(mtd_get_mac_binary mac 8)  $(($PHYNBR - 1)) ) > /sys${DEVPATH}/macaddress
+ 		;;
+ 	*)
+diff --git a/target/linux/ar71xx/image/tp-link.mk b/target/linux/ar71xx/image/tp-link.mk
+index 4022126dc5..0e2b374a96 100644
+--- a/target/linux/ar71xx/image/tp-link.mk
++++ b/target/linux/ar71xx/image/tp-link.mk
+@@ -122,7 +122,7 @@ TARGET_DEVICES += archer-c25-v1
+ define Device/archer-c58-v1
+   $(Device/archer-cxx)
+   DEVICE_TITLE := TP-LINK Archer C58 v1
+-  DEVICE_PACKAGES := kmod-ath10k
++  DEVICE_PACKAGES := kmod-ath10k ath10k-firmware-qca9888
+   BOARDNAME := ARCHER-C58-V1
+   TPLINK_BOARD_NAME := ARCHER-C58-V1
+   DEVICE_PROFILE := ARCHERC58V1
+@@ -136,7 +136,7 @@ endef
+ 
+ define Device/archer-c59-v1
+   DEVICE_TITLE := TP-LINK Archer C59 v1
+-  DEVICE_PACKAGES := kmod-usb-core kmod-usb2 kmod-usb-ledtrig-usbport kmod-ath10k
++  DEVICE_PACKAGES := kmod-usb-core kmod-usb2 kmod-usb-ledtrig-usbport kmod-ath10k ath10k-firmware-qca9888
+   BOARDNAME := ARCHER-C59-V1
+   TPLINK_BOARD_NAME := ARCHER-C59-V1
+   DEVICE_PROFILE := ARCHERC59V1
+@@ -151,7 +151,7 @@ TARGET_DEVICES += archer-c59-v1
+ 
+ define Device/archer-c60-v1
+   DEVICE_TITLE := TP-LINK Archer C60 v1
+-  DEVICE_PACKAGES := kmod-ath10k
++  DEVICE_PACKAGES := kmod-ath10k ath10k-firmware-qca9888
+   BOARDNAME := ARCHER-C60-V1
+   TPLINK_BOARD_NAME := ARCHER-C60-V1
+   DEVICE_PROFILE := ARCHERC60V1
+-- 
+2.15.0
+
