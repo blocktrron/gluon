@@ -1,0 +1,586 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Tue, 17 Apr 2018 01:28:49 +0200
+Subject: ar71xx: add support for Fritz!WLAN Repeater 1750E
+
+This commit adds support for the AVM Fritz!WLAN Repeater 1750E
+
+SOC:	Qualcomm QCA9556 (Scorpion) 720MHz MIPS74Kc
+RAM:    64MB Zentel A3R12E40CBF DDR2
+FLASH:  16MiB Winbond W25Q128 SPI NOR
+WLAN1:  QCA9556 2.4 GHz 802.11b/g/n 3x3
+WLAN2:  QCA9880 5 GHz 802.11 n/ac 3x3
+INPUT:  WPS button
+LED:    Power, WiFi, LAN, RSSI indicator
+Serial: Header Next to Black metal shield
+        Pinout is 3.3V - RX - TX - GND (Square Pad is 3.3V)
+        The Serial setting is 115200-8-N-1.
+
+Tested and working:
+ - Ethernet
+ - 2.4 GHz WiFi (correct MAC)
+ - 5 GHz WiFi (correct MAC)
+ - Installation via EVA bootloader
+ - OpenWRT sysupgrade
+ - Buttons
+ - LEDs
+
+Installation via EVA:
+In the first seconds after Power is connected, the bootloader will
+listen for FTP connections on 192.168.178.1. Firmware can be uploaded
+like following:
+
+  ftp> quote USER adam2
+  ftp> quote PASS adam2
+  ftp> binary
+  ftp> debug
+  ftp> passive
+  ftp> quote MEDIA FLSH
+  ftp> put openwrt-sysupgrade.bin mtd1
+
+Note that this procedure might take up to two minutes.
+You need to powercycle the Device afterwards to boot OpenWRT.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/ar71xx/base-files/etc/board.d/01_leds b/target/linux/ar71xx/base-files/etc/board.d/01_leds
+index 3bc98bd99ff166d646662bb9a2c5894650cb47c5..f023897004e3eaaf326f745351418c177058983f 100755
+--- a/target/linux/ar71xx/base-files/etc/board.d/01_leds
++++ b/target/linux/ar71xx/base-files/etc/board.d/01_leds
+@@ -308,6 +308,16 @@ fritz300e)
+ 	ucidef_set_led_rssi "rssimediumhigh" "RSSIMEDIUMHIGH" "$board:green:rssi3" "wlan0" "60" "100"
+ 	ucidef_set_led_rssi "rssihigh" "RSSIHIGH" "$board:green:rssi4" "wlan0" "80" "100"
+ 	;;
++fritz1750e)
++	ucidef_set_led_netdev "lan" "LAN" "$board:green:lan" "eth0"
++	ucidef_set_led_wlan "wlan" "WLAN" "$board:green:wlan" "phy0tpt"
++	ucidef_set_rssimon "wlan0" "200000" "1"
++	ucidef_set_led_rssi "rssilow" "RSSILOW" "$board:green:rssi0" "wlan0" "1" "100"
++	ucidef_set_led_rssi "rssimediumlow" "RSSIMEDIUMLOW" "$board:green:rssi1" "wlan0" "20" "100"
++	ucidef_set_led_rssi "rssimedium" "RSSIMEDIUM" "$board:green:rssi2" "wlan0" "40" "100"
++	ucidef_set_led_rssi "rssimediumhigh" "RSSIMEDIUMHIGH" "$board:green:rssi3" "wlan0" "60" "100"
++	ucidef_set_led_rssi "rssihigh" "RSSIHIGH" "$board:green:rssi4" "wlan0" "80" "100"
++	;;
+ dap-1330-a1)
+ 	ucidef_set_rssimon "wlan0" "2000000" "2"
+ 	ucidef_set_led_rssi "wifi-low" "wifi-low" "d-link:red:wifi" "wlan0" "1" "29"
+diff --git a/target/linux/ar71xx/base-files/etc/board.d/02_network b/target/linux/ar71xx/base-files/etc/board.d/02_network
+index a5e58273621d1a22c0295fffc7e00e0a72875863..c6975c5a94947d91840264f7297b2d055c79d581 100755
+--- a/target/linux/ar71xx/base-files/etc/board.d/02_network
++++ b/target/linux/ar71xx/base-files/etc/board.d/02_network
+@@ -80,6 +80,7 @@ ar71xx_setup_interfaces()
+ 	eap300v2|\
+ 	eap7660d|\
+ 	el-mini|\
++	fritz1750e|\
+ 	fritz300e|\
+ 	fritz450e|\
+ 	gl-usb150|\
+@@ -581,6 +582,7 @@ ar71xx_setup_macs()
+ 		lan_mac=$(mtd_get_mac_binary caldata 0)
+ 		wan_mac=$(mtd_get_mac_binary caldata 6)
+ 		;;
++	fritz1750e|\
+ 	fritz300e)
+ 		lan_mac=$(fritz_tffs -n maca -i $(find_mtd_part "tffs (1)"))
+ 		;;
+diff --git a/target/linux/ar71xx/base-files/etc/diag.sh b/target/linux/ar71xx/base-files/etc/diag.sh
+index 137baa935e984346789c194edec46d07b9ea2cc4..c11863ba00b18ad407759666f913391eebf930e7 100644
+--- a/target/linux/ar71xx/base-files/etc/diag.sh
++++ b/target/linux/ar71xx/base-files/etc/diag.sh
+@@ -67,6 +67,7 @@ get_status_led() {
+ 	archer-c60-v2|\
+ 	archer-c7-v4|\
+ 	archer-c7-v5|\
++	fritz1750e|\
+ 	fritz300e|\
+ 	fritz4020|\
+ 	fritz450e|\
+diff --git a/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/10-ath9k-eeprom b/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/10-ath9k-eeprom
+index 94bce7d335847bc06ff521339263384b67a471fa..29eca6bf099cfd9e94bc23c111c5fff684747a4f 100644
+--- a/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/10-ath9k-eeprom
++++ b/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/10-ath9k-eeprom
+@@ -75,6 +75,7 @@ case "$FIRMWARE" in
+ 		ath9k_eeprom_extract "art" 4096 2048
+ 		ath9k_patch_firmware_mac $(macaddr_add $(mtd_get_mac_binary art 0) +1)
+ 		;;
++	fritz1750e|\
+ 	fritz4020|\
+ 	fritz450e)
+ 		ath9k_eeprom_extract_reverse "urlader" 5441 1088
+diff --git a/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata b/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
+index 53f53775fd73b5ccaa11554019c1aa1551d19801..00543884f8935cec898e36cf7e2434824e580ef0 100644
+--- a/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
++++ b/target/linux/ar71xx/base-files/etc/hotplug.d/firmware/11-ath10k-caldata
+@@ -100,6 +100,9 @@ case "$FIRMWARE" in
+ 		ath10kcal_extract "caldata" 20480 2116
+ 		ath10kcal_patch_mac $(macaddr_add $(cat /sys/class/net/eth0/address) +1)
+ 		;;
++	fritz1750e)
++		ath10kcal_extract "urlader" 6538 2116
++		;;
+ 	gl-ar750|\
+ 	tl-wpa8630)
+ 		ath10kcal_extract "art" 20480 2116
+diff --git a/target/linux/ar71xx/base-files/lib/ar71xx.sh b/target/linux/ar71xx/base-files/lib/ar71xx.sh
+index f2bc57cb30356e561482477b4e8db288c5e464e4..a7d5a9b89a4226b4590ce89834e59afc91d2ada0 100755
+--- a/target/linux/ar71xx/base-files/lib/ar71xx.sh
++++ b/target/linux/ar71xx/base-files/lib/ar71xx.sh
+@@ -727,6 +727,9 @@ ar71xx_board_detect() {
+ 	*"FRITZ!Box 4020")
+ 		name="fritz4020"
+ 		;;
++	*"FRITZ!WLAN Repeater 1750E")
++		name="fritz1750e"
++		;;
+ 	*"FRITZ!WLAN Repeater 300E")
+ 		name="fritz300e"
+ 		;;
+diff --git a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
+index 4402c70af43783696fa2f7dcee4a02aac1263e15..2f50f34d80af19906a1cd096bf622aa6446a1c0d 100755
+--- a/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
++++ b/target/linux/ar71xx/base-files/lib/upgrade/platform.sh
+@@ -694,6 +694,7 @@ platform_check_image() {
+ 		return 0;
+ 		;;
+ 	# these boards use metadata images
++	fritz1750e|\
+ 	fritz300e|\
+ 	fritz4020|\
+ 	fritz450e|\
+diff --git a/target/linux/ar71xx/config-4.9 b/target/linux/ar71xx/config-4.9
+index ca976677f0cab3ffcd0a96378cf127e6f8c322fd..ede6bbd0382dccac9675cb82fbb9437b84bbcf30 100644
+--- a/target/linux/ar71xx/config-4.9
++++ b/target/linux/ar71xx/config-4.9
+@@ -114,6 +114,7 @@ CONFIG_ATH79=y
+ # CONFIG_ATH79_MACH_EW_BALIN is not set
+ # CONFIG_ATH79_MACH_EW_DORIN is not set
+ # CONFIG_ATH79_MACH_F9K1115V2 is not set
++# CONFIG_ATH79_MACH_FRITZ1750E is not set
+ # CONFIG_ATH79_MACH_FRITZ300E is not set
+ # CONFIG_ATH79_MACH_FRITZ4020 is not set
+ # CONFIG_ATH79_MACH_FRITZ450E is not set
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt b/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt
+index b713629da332ad3ed1d235ecc78ad1c7ddb7b209..b001f0c2064cc05e6043a8f94dd05b22a5561d15 100644
+--- a/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt
++++ b/target/linux/ar71xx/files/arch/mips/ath79/Kconfig.openwrt
+@@ -2360,6 +2360,16 @@ config ATH79_MACH_TL_WPA8630
+ 	select ATH79_DEV_M25P80
+ 	select ATH79_DEV_WMAC
+ 
++config ATH79_MACH_FRITZ1750E
++	bool "AVM FRITZ!WLAN Repeater 1750E support"
++	select SOC_QCA955X
++	select ATH79_DEV_AP9X_PCI if PCI
++	select ATH79_DEV_ETH
++	select ATH79_DEV_GPIO_BUTTONS
++	select ATH79_DEV_LEDS_GPIO
++	select ATH79_DEV_M25P80
++	select ATH79_DEV_WMAC
++
+ config ATH79_MACH_FRITZ300E
+ 	bool "AVM FRITZ!WLAN Repeater 300E support"
+ 	select SOC_AR724X
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/Makefile b/target/linux/ar71xx/files/arch/mips/ath79/Makefile
+index fa63cca6215f9c2cac741f4b6109577806c9f646..c034c1011c38dc224126326bcf81e79c61c8c9fb 100644
+--- a/target/linux/ar71xx/files/arch/mips/ath79/Makefile
++++ b/target/linux/ar71xx/files/arch/mips/ath79/Makefile
+@@ -125,6 +125,7 @@ obj-$(CONFIG_ATH79_MACH_ESR900)			+= mach-esr900.o
+ obj-$(CONFIG_ATH79_MACH_EW_BALIN)		+= mach-ew-balin.o
+ obj-$(CONFIG_ATH79_MACH_EW_DORIN)		+= mach-ew-dorin.o
+ obj-$(CONFIG_ATH79_MACH_F9K1115V2)		+= mach-f9k1115v2.o
++obj-$(CONFIG_ATH79_MACH_FRITZ1750E)		+= mach-fritz1750e.o
+ obj-$(CONFIG_ATH79_MACH_FRITZ300E)		+= mach-fritz300e.o
+ obj-$(CONFIG_ATH79_MACH_FRITZ4020)		+= mach-fritz4020.o
+ obj-$(CONFIG_ATH79_MACH_FRITZ450E)		+= mach-fritz450e.o
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz1750e.c b/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz1750e.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..29877ee5c3b60ec6174290329b620b74f6ec31ea
+--- /dev/null
++++ b/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz1750e.c
+@@ -0,0 +1,252 @@
++/*
++ *  AVM FRITZ!WLAN Repeater 1750E board support
++ *
++ *  Copyright (C) 2018 David Bauer <mail@david-bauer.net>
++ *
++ *  This program is free software; you can redistribute it and/or modify it
++ *  under the terms of the GNU General Public License version 2 as published
++ *  by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/ath9k_platform.h>
++#include <linux/etherdevice.h>
++#include <linux/gpio.h>
++#include <linux/platform_device.h>
++
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/platform_data/mdio-gpio.h>
++#include <linux/platform_data/phy-at803x.h>
++#include <linux/spi/spi_gpio.h>
++#include <linux/spi/74x164.h>
++
++#include <asm/mach-ath79/ath79.h>
++#include <asm/mach-ath79/ar71xx_regs.h>
++
++#include "common.h"
++#include "dev-eth.h"
++#include "dev-gpio-buttons.h"
++#include "dev-leds-gpio.h"
++#include "dev-m25p80.h"
++#include "dev-spi.h"
++#include "dev-wmac.h"
++#include "machtypes.h"
++#include "pci.h"
++
++
++#define FRITZ1750E_GPIO_SHIFT_SER		15   /* DS,   Data Serial Input */
++#define FRITZ1750E_GPIO_SHIFT_SRCLK		14 /* SHCP, Shift Reg Clock Input */
++
++#define FRITZ1750E_SSR_BIT_0			0
++#define FRITZ1750E_SSR_BIT_1			1
++#define FRITZ1750E_SSR_BIT_2			2
++#define FRITZ1750E_SSR_BIT_3			3
++#define FRITZ1750E_SSR_BIT_4			4
++#define FRITZ1750E_SSR_BIT_5			5
++#define FRITZ1750E_SSR_BIT_6			6
++#define FRITZ1750E_SSR_BIT_7			7
++
++#define FRITZ1750E_74HC_GPIO_BASE		32
++#define FRITZ1750E_74HC_GPIO_LED_RSSI0		(FRITZ1750E_74HC_GPIO_BASE + 0)
++#define FRITZ1750E_74HC_GPIO_LED_RSSI1		(FRITZ1750E_74HC_GPIO_BASE + 1)
++#define FRITZ1750E_74HC_GPIO_LED_RSSI2		(FRITZ1750E_74HC_GPIO_BASE + 2)
++#define FRITZ1750E_74HC_GPIO_LED_RSSI3		(FRITZ1750E_74HC_GPIO_BASE + 3)
++#define FRITZ1750E_74HC_GPIO_LED_RSSI4		(FRITZ1750E_74HC_GPIO_BASE + 4)
++#define FRITZ1750E_74HC_GPIO_LED_WLAN		(FRITZ1750E_74HC_GPIO_BASE + 5)
++#define FRITZ1750E_74HC_GPIO_LED_POWER		(FRITZ1750E_74HC_GPIO_BASE + 6)
++
++#define FRITZ1750E_GPIO_LED_LAN			13
++
++#define FRITZ1750E_GPIO_BTN_WPS			4
++#define FRITZ1750E_KEYS_POLL_INTERVAL		20 /* msecs */
++#define FRITZ1750E_KEYS_DEBOUNCE_INTERVAL	(3 * FRITZ1750E_KEYS_POLL_INTERVAL)
++
++#define FRITZ1750E_PHY_ADDRESS			0
++#define FRITZ1750E_GPIO_PHY_RESET		11
++#define FRITZ1750E_GPIO_MDIO_CLK		12
++#define FRITZ1750E_GPIO_MDIO_DATA		19
++
++#define FRITZ1750E_GPIO_PEREGRINE_RESET		17
++#define FRITZ1750E_GPIO_PCIE_RESET		18
++
++
++
++static struct spi_gpio_platform_data fritz1750e_spi_data = {
++	.sck		= FRITZ1750E_GPIO_SHIFT_SRCLK,
++	.miso		= SPI_GPIO_NO_MISO,
++	.mosi		= FRITZ1750E_GPIO_SHIFT_SER,
++	.num_chipselect	= 1,
++};
++
++static u8 fritz1750e_ssr_initdata[] = {
++	BIT(FRITZ1750E_SSR_BIT_7) |
++	BIT(FRITZ1750E_SSR_BIT_6) |
++	BIT(FRITZ1750E_SSR_BIT_5) |
++	BIT(FRITZ1750E_SSR_BIT_4) |
++	BIT(FRITZ1750E_SSR_BIT_3) |
++	BIT(FRITZ1750E_SSR_BIT_2) |
++	BIT(FRITZ1750E_SSR_BIT_1)
++};
++
++static struct gen_74x164_chip_platform_data fritz1750e_ssr_data = {
++	.base		= FRITZ1750E_74HC_GPIO_BASE,
++	.num_registers	= ARRAY_SIZE(fritz1750e_ssr_initdata),
++	.init_data	= fritz1750e_ssr_initdata,
++};
++
++static struct platform_device fritz1750e_spi_device = {
++	.name		= "spi_gpio",
++	.id		= 1,
++	.dev = {
++		.platform_data = &fritz1750e_spi_data,
++	},
++};
++
++static struct spi_board_info fritz1750e_spi_info[] = {
++	{
++		.bus_num		= 1,
++		.chip_select		= 0,
++		.max_speed_hz		= 10000000,
++		.modalias		= "74x164",
++		.platform_data		= &fritz1750e_ssr_data,
++		.controller_data	= (void *) 0x0,
++	},
++};
++
++static struct mtd_partition fritz1750e_flash_partitions[] = {
++	{
++		.name		= "urlader",
++		.offset		= 0,
++		.size		= 0x0020000,
++		.mask_flags	= MTD_WRITEABLE,
++	}, {
++		.name		= "firmware",
++		.offset		= 0x0020000,
++		.size		= 0x0EE0000,
++	}, {
++		.name		= "tffs (1)",
++		.offset		= 0x0f00000,
++		.size		= 0x0080000,
++		.mask_flags	= MTD_WRITEABLE,
++	}, {
++		.name		= "tffs (2)",
++		.offset		= 0x0f80000,
++		.size		= 0x0080000,
++		.mask_flags	= MTD_WRITEABLE,
++	}
++};
++
++static struct flash_platform_data fritz1750e_flash_data = {
++	.parts		= fritz1750e_flash_partitions,
++	.nr_parts	= ARRAY_SIZE(fritz1750e_flash_partitions),
++};
++
++static struct gpio_led fritz1750e_leds_gpio[] __initdata = {
++	{
++		.name		= "fritz1750e:green:lan",
++		.gpio		= FRITZ1750E_GPIO_LED_LAN,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:rssi0",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_RSSI0,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:rssi1",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_RSSI1,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:rssi2",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_RSSI2,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:rssi3",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_RSSI3,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:rssi4",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_RSSI4,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:wlan",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_WLAN,
++		.active_low	= 0,
++	}, {
++		.name		= "fritz1750e:green:power",
++		.gpio		= FRITZ1750E_74HC_GPIO_LED_POWER,
++		.active_low	= 0,
++	},
++};
++
++static struct gpio_keys_button fritz1750e_gpio_keys[] __initdata = {
++	{
++		.desc			= "WPS Button",
++		.type			= EV_KEY,
++		.code			= KEY_WPS_BUTTON,
++		.debounce_interval	= FRITZ1750E_KEYS_DEBOUNCE_INTERVAL,
++		.gpio			= FRITZ1750E_GPIO_BTN_WPS,
++		.active_low		= 1,
++	}
++};
++
++static struct at803x_platform_data fritz1750e_at803x_data = {
++	.disable_smarteee = 1,
++	.has_reset_gpio = 1,
++	.override_sgmii_aneg = 1,
++	.reset_gpio = FRITZ1750E_GPIO_PHY_RESET,
++};
++
++static struct mdio_board_info fritz1750e_mdio_info[] = {
++	{
++		.bus_id = "ag71xx-mdio.1",
++		.phy_addr = FRITZ1750E_PHY_ADDRESS,
++		.platform_data = &fritz1750e_at803x_data,
++	},
++};
++
++static void __init fritz1750e_setup(void) {
++	ath79_register_m25p80(&fritz1750e_flash_data);
++
++	gpio_request_one(FRITZ1750E_GPIO_MDIO_CLK, GPIOF_OUT_INIT_HIGH, "MDC Pull-UP");
++	gpio_request_one(FRITZ1750E_GPIO_MDIO_DATA, GPIOF_OUT_INIT_HIGH, "MDIO Pull-UP");
++	gpio_request_one(FRITZ1750E_GPIO_PHY_RESET, GPIOF_OUT_INIT_HIGH, "PHY reset");
++	gpio_request_one(FRITZ1750E_GPIO_PEREGRINE_RESET, GPIOF_OUT_INIT_HIGH, "PEREGRINE reset");
++	gpio_request_one(FRITZ1750E_GPIO_PCIE_RESET, GPIOF_OUT_INIT_HIGH, "PCIE reset");
++
++	/* Register PHY device */
++	mdiobus_register_board_info(fritz1750e_mdio_info,
++				    ARRAY_SIZE(fritz1750e_mdio_info));
++
++	ath79_register_mdio(1, ~BIT(FRITZ1750E_PHY_ADDRESS));
++	ath79_eth0_data.mii_bus_dev = &ath79_mdio1_device.dev;
++	ath79_eth0_data.phy_if_mode = PHY_INTERFACE_MODE_SGMII;
++	ath79_eth0_data.phy_mask = BIT(FRITZ1750E_PHY_ADDRESS);
++	ath79_eth0_data.enable_sgmii_fixup = 1;
++	ath79_eth0_pll_data.pll_1000 = 0x03000000;
++	ath79_eth0_pll_data.pll_100 = 0x00000101;
++	ath79_eth0_pll_data.pll_10 = 0x00001313;
++	ath79_register_eth(0);
++
++	/* Initialize 2.4GHz WiFi */
++	ath79_register_wmac_simple();
++
++	/* Initialize 5GHz WiFi */
++	ath79_register_pci();
++
++	/* Register LED shift-register */
++	spi_register_board_info(fritz1750e_spi_info,
++				ARRAY_SIZE(fritz1750e_spi_info));
++	platform_device_register(&fritz1750e_spi_device);
++
++	/* Register GPIO buttons */
++	ath79_register_gpio_keys_polled(-1, FRITZ1750E_KEYS_POLL_INTERVAL,
++					ARRAY_SIZE(fritz1750e_gpio_keys),
++					fritz1750e_gpio_keys);
++
++	/* Register LEDs */
++	ath79_register_leds_gpio(-1, ARRAY_SIZE(fritz1750e_leds_gpio),
++				 fritz1750e_leds_gpio);
++}
++
++MIPS_MACHINE(ATH79_MACH_FRITZ1750E, "FRITZ1750E",
++	     "AVM FRITZ!WLAN Repeater 1750E", fritz1750e_setup);
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h b/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h
+index 008e9d8d8597f0d34c2436ebb4fb5c50f542d198..8803da9fec7b07d035ecd60e5055f7b6e367907a 100644
+--- a/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h
++++ b/target/linux/ar71xx/files/arch/mips/ath79/machtypes.h
+@@ -121,6 +121,7 @@ enum ath79_mach_type {
+ 	ATH79_MACH_EW_DORIN,			/* embedded wireless Dorin Platform */
+ 	ATH79_MACH_EW_DORIN_ROUTER,		/* embedded wireless Dorin Router Platform */
+ 	ATH79_MACH_F9K1115V2,			/* Belkin AC1750DB */
++	ATH79_MACH_FRITZ1750E,			/* AVM FRITZ!WLAN Repeater 1750E */
+ 	ATH79_MACH_FRITZ300E,			/* AVM FRITZ!WLAN Repeater 300E */
+ 	ATH79_MACH_FRITZ4020,			/* AVM FRITZ!Box 4020 */
+ 	ATH79_MACH_FRITZ450E,			/* AVM FRITZ!WLAN Repeater 450E */
+diff --git a/target/linux/ar71xx/generic/config-default b/target/linux/ar71xx/generic/config-default
+index a857844f33aee064aa4c6a89412973521cfa25cb..65baee25aae786c4fef3d2bc4dc964da5fa390d1 100644
+--- a/target/linux/ar71xx/generic/config-default
++++ b/target/linux/ar71xx/generic/config-default
+@@ -87,6 +87,7 @@ CONFIG_ATH79_MACH_ESR900=y
+ CONFIG_ATH79_MACH_EW_BALIN=y
+ CONFIG_ATH79_MACH_EW_DORIN=y
+ CONFIG_ATH79_MACH_F9K1115V2=y
++CONFIG_ATH79_MACH_FRITZ1750E=y
+ CONFIG_ATH79_MACH_FRITZ300E=y
+ CONFIG_ATH79_MACH_FRITZ4020=y
+ CONFIG_ATH79_MACH_FRITZ450E=y
+diff --git a/target/linux/ar71xx/image/generic.mk b/target/linux/ar71xx/image/generic.mk
+index c74ca130b64ed02f239e9489c248ef4947c59822..f4efe27131e4965b0bb7dfaa75000fe5464ebb71 100644
+--- a/target/linux/ar71xx/image/generic.mk
++++ b/target/linux/ar71xx/image/generic.mk
+@@ -1302,6 +1302,16 @@ define Device/AVM
+ 	append-rootfs | pad-rootfs | append-metadata | check-size $$$$(IMAGE_SIZE)
+ endef
+ 
++define Device/fritz1750e
++  $(call Device/AVM)
++  DEVICE_TITLE := AVM FRITZ!WLAN Repeater 1750E
++  DEVICE_PACKAGES += kmod-ath10k ath10k-firmware-qca988x rssileds -swconfig
++  BOARDNAME := FRITZ1750E
++  SUPPORTED_DEVICES := fritz1750e
++  IMAGE_SIZE := 15232k
++endef
++TARGET_DEVICES += fritz1750e
++
+ define Device/fritz300e
+   $(call Device/AVM)
+   DEVICE_TITLE := AVM FRITZ!WLAN Repeater 300E
+diff --git a/target/linux/ar71xx/patches-4.9/911-add-pcie-init-qca955x.patch b/target/linux/ar71xx/patches-4.9/911-add-pcie-init-qca955x.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e149b8211c055eb7184fc076af68c85b43e943c0
+--- /dev/null
++++ b/target/linux/ar71xx/patches-4.9/911-add-pcie-init-qca955x.patch
+@@ -0,0 +1,83 @@
++Index: linux-4.9.109/arch/mips/pci/pci-ar724x.c
++===================================================================
++--- linux-4.9.109.orig/arch/mips/pci/pci-ar724x.c
+++++ linux-4.9.109/arch/mips/pci/pci-ar724x.c
++@@ -39,6 +39,7 @@
++ 				 PCI_COMMAND_SERR |		\
++ 				 PCI_COMMAND_FAST_BACK)
++ 
+++
++ struct ar724x_pci_controller {
++ 	void __iomem *devcfg_base;
++ 	void __iomem *ctrl_base;
++@@ -334,19 +335,35 @@ static void ar724x_pci_hw_init(struct ar
++ 	u32 ppl, app;
++ 	int wait = 0;
++ 
++-	/* deassert PCIe host controller and PCIe PHY reset */
++-	ath79_device_reset_clear(AR724X_RESET_PCIE);
++-	ath79_device_reset_clear(AR724X_RESET_PCIE_PHY);
++-
++-	/* remove the reset of the PCIE PLL */
++-	ppl = ath79_pll_rr(AR724X_PLL_REG_PCIE_CONFIG);
++-	ppl &= ~AR724X_PLL_REG_PCIE_CONFIG_PPL_RESET;
++-	ath79_pll_wr(AR724X_PLL_REG_PCIE_CONFIG, ppl);
++-
++-	/* deassert bypass for the PCIE PLL */
++-	ppl = ath79_pll_rr(AR724X_PLL_REG_PCIE_CONFIG);
++-	ppl &= ~AR724X_PLL_REG_PCIE_CONFIG_PPL_BYPASS;
++-	ath79_pll_wr(AR724X_PLL_REG_PCIE_CONFIG, ppl);
+++	if (soc_is_qca9556()) {
+++		/* deassert PCIe host controller and PCIe PHY reset */
+++		ath79_device_reset_clear(QCA955X_RESET_PCIE_PHY);
+++		ath79_device_reset_clear(QCA955X_RESET_PCIE);
+++
+++		/* remove the reset of the PCIE PLL */
+++		ppl = ath79_pll_rr(QCA955X_PLL_PCIE_CONFIG_REG);
+++		ppl &= ~QCA955X_PLL_PCIE_CONFIG_PLL_PWD;
+++		ath79_pll_wr(QCA955X_PLL_PCIE_CONFIG_REG, ppl);
+++
+++		/* deassert bypass for the PCIE PLL */
+++		ppl = ath79_pll_rr(QCA955X_PLL_PCIE_CONFIG_REG);
+++		ppl &= ~QCA955X_PLL_PCIE_CONFIG_PLL_BYPASS;
+++		ath79_pll_wr(QCA955X_PLL_PCIE_CONFIG_REG, ppl);
+++	} else if (soc_is_ar724x()) {
+++		/* deassert PCIe host controller and PCIe PHY reset */
+++		ath79_device_reset_clear(AR724X_RESET_PCIE);
+++		ath79_device_reset_clear(AR724X_RESET_PCIE_PHY);
+++
+++		/* remove the reset of the PCIE PLL */
+++		ppl = ath79_pll_rr(AR724X_PLL_REG_PCIE_CONFIG);
+++		ppl &= ~AR724X_PLL_REG_PCIE_CONFIG_PPL_RESET;
+++		ath79_pll_wr(AR724X_PLL_REG_PCIE_CONFIG, ppl);
+++
+++		/* deassert bypass for the PCIE PLL */
+++		ppl = ath79_pll_rr(AR724X_PLL_REG_PCIE_CONFIG);
+++		ppl &= ~AR724X_PLL_REG_PCIE_CONFIG_PPL_BYPASS;
+++		ath79_pll_wr(AR724X_PLL_REG_PCIE_CONFIG, ppl);
+++	}
++ 
++ 	/* set PCIE Application Control to ready */
++ 	app = __raw_readl(apc->ctrl_base + AR724X_PCI_REG_APP);
++Index: linux-4.9.109/arch/mips/include/asm/mach-ath79/ar71xx_regs.h
++===================================================================
++--- linux-4.9.109.orig/arch/mips/include/asm/mach-ath79/ar71xx_regs.h
+++++ linux-4.9.109/arch/mips/include/asm/mach-ath79/ar71xx_regs.h
++@@ -382,6 +382,7 @@
++ #define QCA955X_PLL_CPU_CONFIG_REG		0x00
++ #define QCA955X_PLL_DDR_CONFIG_REG		0x04
++ #define QCA955X_PLL_CLK_CTRL_REG		0x08
+++#define QCA955X_PLL_PCIE_CONFIG_REG		0x0c
++ #define QCA955X_PLL_ETH_XMII_CONTROL_REG	0x28
++ #define QCA955X_PLL_ETH_SGMII_CONTROL_REG	0x48
++ 
++@@ -416,6 +417,9 @@
++ #define QCA955X_PLL_CLK_CTRL_DDRCLK_FROM_DDRPLL		BIT(21)
++ #define QCA955X_PLL_CLK_CTRL_AHBCLK_FROM_DDRPLL		BIT(24)
++ 
+++#define QCA955X_PLL_PCIE_CONFIG_PLL_PWD			BIT(30)
+++#define QCA955X_PLL_PCIE_CONFIG_PLL_BYPASS		BIT(16)
+++
++ #define QCA956X_PLL_CPU_CONFIG_REG			0x00
++ #define QCA956X_PLL_CPU_CONFIG1_REG			0x04
++ #define QCA956X_PLL_DDR_CONFIG_REG			0x08

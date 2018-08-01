@@ -34,8 +34,17 @@ factory
 
 
 # AVM
+
+device avm-fritz-wlan-repeater-1750e fritz1750e
+factory
+packages $ATH10K_PACKAGES
+
 device avm-fritz-box-4020 fritz4020 fritz4020
 factory
+
+device avm-fritz-wlan-repeater-450e fritz450e
+factory
+
 
 # Buffalo
 
