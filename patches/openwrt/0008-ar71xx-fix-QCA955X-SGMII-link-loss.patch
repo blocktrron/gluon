@@ -1,0 +1,223 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 12 Jul 2018 21:47:15 +0200
+Subject: ar71xx: fix QCA955X SGMII link loss
+
+The QCA955X is affected by a hardware bug which causes link-loss of the
+SGMII link between SoC and PHY. This happens on change of link-state or
+speed.
+
+It is not really known what causes this bug. It definitely occurs when
+using a AR8033 Gigabit Ethernet PHY.
+
+This bug was first proposed to be fixed by Sven Eckelmann in 2016.
+ https://patchwork.ozlabs.org/patch/604782/
+
+Based-on-patch-by: Sven Eckelmann <sven.eckelmann@open-mesh.com>
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/dev-eth.c b/target/linux/ar71xx/files/arch/mips/ath79/dev-eth.c
+index 1e230bce616871bfae330e1ffd96f05794d836f2..59592c8263a21209548352ad1a2553b30c697fda 100644
+--- a/target/linux/ar71xx/files/arch/mips/ath79/dev-eth.c
++++ b/target/linux/ar71xx/files/arch/mips/ath79/dev-eth.c
+@@ -1040,8 +1040,9 @@ void __init ath79_register_eth(unsigned int id)
+ 			pdata->set_speed = qca955x_set_speed_xmii;
+ 
+ 			/* QCA9556 only has SGMII interface */
+-			if (ath79_soc == ATH79_SOC_QCA9556)
++			if (ath79_soc == ATH79_SOC_QCA9556) {
+ 				pdata->set_speed = qca9556_set_speed_sgmii;
++			}
+ 		} else {
+ 			pdata->reset_bit = QCA955X_RESET_GE1_MAC |
+ 					   QCA955X_RESET_GE1_MDIO;
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz450e.c b/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz450e.c
+index ee0a18530414c1e21cb082f74900b2aaf59300a6..e48ddd65e7c37d6955824a158aa03316b6b52108 100644
+--- a/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz450e.c
++++ b/target/linux/ar71xx/files/arch/mips/ath79/mach-fritz450e.c
+@@ -155,6 +155,7 @@ static void __init fritz450E_setup(void) {
+ 	ath79_eth0_data.mii_bus_dev = &ath79_mdio1_device.dev;
+ 	ath79_eth0_data.phy_if_mode = PHY_INTERFACE_MODE_SGMII;
+ 	ath79_eth0_data.phy_mask = BIT(FRITZ450E_PHY_ADDRESS);
++	ath79_eth0_data.enable_sgmii_fixup = 1;
+ 	ath79_eth0_pll_data.pll_1000 = 0x03000000;
+ 	ath79_eth0_pll_data.pll_100 = 0x00000101;
+ 	ath79_eth0_pll_data.pll_10 = 0x00001313;
+diff --git a/target/linux/ar71xx/files/arch/mips/include/asm/mach-ath79/ag71xx_platform.h b/target/linux/ar71xx/files/arch/mips/include/asm/mach-ath79/ag71xx_platform.h
+index c4c3a6d44c935b84b5d6dae58a4f441e5492463c..e476d57e45edb8798ee847409be41b7863c39a42 100644
+--- a/target/linux/ar71xx/files/arch/mips/include/asm/mach-ath79/ag71xx_platform.h
++++ b/target/linux/ar71xx/files/arch/mips/include/asm/mach-ath79/ag71xx_platform.h
+@@ -37,6 +37,7 @@ struct ag71xx_platform_data {
+ 	u8		is_ar724x:1;
+ 	u8		has_ar8216:1;
+ 	u8		use_flow_control:1;
++	u8		enable_sgmii_fixup:1;
+ 	u8		disable_inline_checksum_engine:1;
+ 
+ 	struct ag71xx_switch_platform_data *switch_data;
+diff --git a/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx.h b/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx.h
+index 77ee5b36ecbe27d414e20035ab194c9ab9604a2e..2d9a865043b649560f9666200ae1b391ce8f93d8 100644
+--- a/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx.h
++++ b/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx.h
+@@ -66,6 +66,8 @@
+ #define AG71XX_TX_RING_SIZE_MAX		128
+ #define AG71XX_RX_RING_SIZE_MAX		256
+ 
++#define QCA955X_SGMII_LINK_WAR_MAX_TRY	10
++
+ #ifdef CONFIG_AG71XX_DEBUG
+ #define DBG(fmt, args...)	pr_debug(fmt, ## args)
+ #else
+diff --git a/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx_main.c b/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx_main.c
+index 54ec8e67b36cd917f025975387bfdcf102597144..d89579298ff6abaf6d848748420890d8899638da 100644
+--- a/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx_main.c
++++ b/target/linux/ar71xx/files/drivers/net/ethernet/atheros/ag71xx/ag71xx_main.c
+@@ -31,6 +31,7 @@ MODULE_PARM_DESC(msg_level, "Message level (-1=defaults,0=none,...,16=all)");
+ #define ETH_SWITCH_HEADER_LEN	2
+ 
+ static int ag71xx_tx_packets(struct ag71xx *ag, bool flush);
++static void ag71xx_qca955x_sgmii_init(void);
+ 
+ static inline unsigned int ag71xx_max_frame_len(unsigned int mtu)
+ {
+@@ -610,6 +611,9 @@ __ag71xx_link_adjust(struct ag71xx *ag, bool update)
+ 	if (update && pdata->set_speed)
+ 		pdata->set_speed(ag->speed);
+ 
++	if (update && pdata->enable_sgmii_fixup)
++		ag71xx_qca955x_sgmii_init();
++
+ 	ag71xx_wr(ag, AG71XX_REG_MAC_CFG2, cfg2);
+ 	ag71xx_wr(ag, AG71XX_REG_FIFO_CFG5, fifo5);
+ 	ag71xx_wr(ag, AG71XX_REG_MAC_IFCTL, ifctl);
+@@ -913,6 +917,81 @@ static void ag71xx_tx_timeout(struct net_device *dev)
+ 	schedule_delayed_work(&ag->restart_work, 1);
+ }
+ 
++static void ag71xx_bit_set(void __iomem *reg, u32 bit)
++{
++	u32 val = __raw_readl(reg) | bit;
++	__raw_writel(val, reg);
++	__raw_readl(reg);
++}
++
++static void ag71xx_bit_clear(void __iomem *reg, u32 bit)
++{
++	u32 val = __raw_readl(reg) & ~bit;
++	__raw_writel(val, reg);
++	__raw_readl(reg);
++}
++
++static void ag71xx_qca955x_sgmii_init()
++{
++	void __iomem *gmac_base;
++	u32 mr_an_status, sgmii_status;
++	u8 tries = 0;
++
++	gmac_base = ioremap_nocache(QCA955X_GMAC_BASE, QCA955X_GMAC_SIZE);
++
++	if (!gmac_base)
++		goto sgmii_out;
++
++	mr_an_status = __raw_readl(gmac_base + QCA955X_GMAC_REG_MR_AN_STATUS);
++	if (!(mr_an_status & QCA955X_MR_AN_STATUS_AN_ABILITY))
++		goto sgmii_out;
++
++	__raw_writel(QCA955X_SGMII_RESET_RX_CLK_N_RESET ,
++		     gmac_base + QCA955X_GMAC_REG_SGMII_RESET);
++	__raw_readl(gmac_base + QCA955X_GMAC_REG_SGMII_RESET);
++	udelay(10);
++
++	// Init sequence
++	ag71xx_bit_set(gmac_base + QCA955X_GMAC_REG_SGMII_RESET,
++		       QCA955X_SGMII_RESET_HW_RX_125M_N);
++	udelay(10);
++
++	ag71xx_bit_set(gmac_base + QCA955X_GMAC_REG_SGMII_RESET,
++		       QCA955X_SGMII_RESET_RX_125M_N);
++	udelay(10);
++
++	ag71xx_bit_set(gmac_base + QCA955X_GMAC_REG_SGMII_RESET,
++		       QCA955X_SGMII_RESET_TX_125M_N);
++	udelay(10);
++
++	ag71xx_bit_set(gmac_base + QCA955X_GMAC_REG_SGMII_RESET,
++		       QCA955X_SGMII_RESET_RX_CLK_N);
++	udelay(10);
++
++	ag71xx_bit_set(gmac_base + QCA955X_GMAC_REG_SGMII_RESET,
++		       QCA955X_SGMII_RESET_TX_CLK_N);
++	udelay(10);
++
++	do {
++		ag71xx_bit_set(gmac_base + QCA955X_GMAC_REG_MR_AN_CONTROL,
++			       QCA955X_MR_AN_CONTROL_PHY_RESET |
++			       QCA955X_MR_AN_CONTROL_AN_ENABLE);
++		udelay(100);
++		ag71xx_bit_clear(gmac_base + QCA955X_GMAC_REG_MR_AN_CONTROL,
++				 QCA955X_MR_AN_CONTROL_PHY_RESET);
++		mdelay(10);
++		sgmii_status = __raw_readl(gmac_base + QCA955X_GMAC_REG_SGMII_DEBUG) & 0xF;
++
++		if (tries++ >= QCA955X_SGMII_LINK_WAR_MAX_TRY) {
++			pr_warn("ag71xx: max retries for SGMII fixup exceeded!\n");
++			break;
++		}
++	} while (!(sgmii_status == 0xf || sgmii_status == 0x10));
++
++sgmii_out:
++	iounmap(gmac_base);
++}
++
+ static void ag71xx_restart_work_func(struct work_struct *work)
+ {
+ 	struct ag71xx *ag = container_of(work, struct ag71xx, restart_work.work);
+diff --git a/target/linux/ar71xx/patches-4.9/940-qca955x-add-more-registers.patch b/target/linux/ar71xx/patches-4.9/940-qca955x-add-more-registers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..97400e3ec88cf910054fa9366758077c75912c5a
+--- /dev/null
++++ b/target/linux/ar71xx/patches-4.9/940-qca955x-add-more-registers.patch
+@@ -0,0 +1,44 @@
++Index: linux-4.9.111/arch/mips/include/asm/mach-ath79/ar71xx_regs.h
++===================================================================
++--- linux-4.9.111.orig/arch/mips/include/asm/mach-ath79/ar71xx_regs.h
+++++ linux-4.9.111/arch/mips/include/asm/mach-ath79/ar71xx_regs.h
++@@ -134,7 +134,7 @@
++ #define QCA955X_PCI_CTRL_SIZE	0x100
++ 
++ #define QCA955X_GMAC_BASE	(AR71XX_APB_BASE + 0x00070000)
++-#define QCA955X_GMAC_SIZE	0x40
+++#define QCA955X_GMAC_SIZE	0x64
++ #define QCA955X_WMAC_BASE	(AR71XX_APB_BASE + 0x00100000)
++ #define QCA955X_WMAC_SIZE	0x20000
++ #define QCA955X_EHCI0_BASE	0x1b000000
++@@ -1269,7 +1269,11 @@
++  */
++ 
++ #define QCA955X_GMAC_REG_ETH_CFG	0x00
+++#define QCA955X_GMAC_REG_SGMII_RESET	0x14
++ #define QCA955X_GMAC_REG_SGMII_SERDES	0x18
+++#define QCA955X_GMAC_REG_MR_AN_CONTROL	0x1c
+++#define QCA955X_GMAC_REG_MR_AN_STATUS	0x20
+++#define QCA955X_GMAC_REG_SGMII_DEBUG	0x58
++ 
++ #define QCA955X_ETH_CFG_RGMII_EN	BIT(0)
++ #define QCA955X_ETH_CFG_MII_GE0		BIT(1)
++@@ -1291,6 +1295,18 @@
++ #define QCA955X_ETH_CFG_TXE_DELAY_MASK	0x3
++ #define QCA955X_ETH_CFG_TXE_DELAY_SHIFT	20
++ 
+++#define QCA955X_SGMII_RESET_RX_CLK_N_RESET	0x0
+++#define QCA955X_SGMII_RESET_RX_CLK_N		BIT(0)
+++#define QCA955X_SGMII_RESET_TX_CLK_N		BIT(1)
+++#define QCA955X_SGMII_RESET_RX_125M_N		BIT(2)
+++#define QCA955X_SGMII_RESET_TX_125M_N		BIT(3)
+++#define QCA955X_SGMII_RESET_HW_RX_125M_N	BIT(4)
+++
+++#define QCA955X_MR_AN_CONTROL_PHY_RESET	BIT(15)
+++#define QCA955X_MR_AN_CONTROL_AN_ENABLE	BIT(12)
+++
+++#define QCA955X_MR_AN_STATUS_AN_ABILITY	BIT(3)
+++
++ #define QCA955X_SGMII_SERDES_LOCK_DETECT_STATUS	BIT(15)
++ #define QCA955X_SGMII_SERDES_RES_CALIBRATION_SHIFT 23
++ #define QCA955X_SGMII_SERDES_RES_CALIBRATION_MASK 0xf
