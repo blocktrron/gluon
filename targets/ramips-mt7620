@@ -1,3 +1,5 @@
+packages 'hostapd-wolfssl'
+
 # GL Innovations
 device gl-mt300a gl-mt300a
 factory

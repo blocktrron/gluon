@@ -1,6 +1,8 @@
 config 'CONFIG_GLUON_SPECIALIZE_KERNEL=y'
 config 'CONFIG_TARGET_SQUASHFS_BLOCK_SIZE=64'
 
+packages 'hostapd-wolfssl'
+
 ATH10K_PACKAGES=
 ATH10K_PACKAGES_QCA9887=
 if [ "$GLUON_WLAN_MESH" = 'ibss' ]; then

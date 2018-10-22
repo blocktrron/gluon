@@ -1,3 +1,5 @@
+packages 'hostapd-wolfssl'
+
 # BROKEN: No AP+IBSS support (plus individual issues)
 if [ "$BROKEN" ]; then
 

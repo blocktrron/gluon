@@ -1,3 +1,5 @@
+packages 'hostapd-wolfssl'
+
 # TP-Link
 
 device tp-link-archer-c50-v3 tplink_c50-v3

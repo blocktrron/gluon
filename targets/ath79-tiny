@@ -2,6 +2,7 @@ config 'CONFIG_GLUON_SPECIALIZE_KERNEL=y'
 
 no_opkg
 packages '-uboot-envtools' '-kmod-usb-core' '-kmod-usb-ohci' '-kmod-usb2' '-kmod-usb-ledtrig-usbport'
+packages 'hostapd-mini'
 
 
 # TP-Link

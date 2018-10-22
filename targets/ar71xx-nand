@@ -1,5 +1,7 @@
 config 'CONFIG_GLUON_SPECIALIZE_KERNEL=y'
 
+packages 'hostapd-wolfssl'
+
 factory -ubi-factory .img
 sysupgrade -squashfs-sysupgrade .tar
 

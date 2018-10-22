@@ -1,3 +1,5 @@
+packages 'hostapd-wolfssl'
+
 ATH10K_PACKAGES_IPQ40XX=
 ATH10K_PACKAGES_QCA9888='ath10k-firmware-qca9888'
 if [ "$GLUON_WLAN_MESH" = 'ibss' ]; then

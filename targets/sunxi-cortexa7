@@ -1,3 +1,5 @@
+packages 'hostapd-wolfssl'
+
 factory -ext4-sdcard .img.gz
 sysupgrade -ext4-sdcard .img.gz
 

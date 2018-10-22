@@ -1,3 +1,5 @@
+packages 'hostapd-wolfssl'
+
 config '# CONFIG_KERNEL_KALLSYMS is not set'
 
 # A5

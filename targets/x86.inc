@@ -1,6 +1,8 @@
 config 'CONFIG_VDI_IMAGES=y'
 config 'CONFIG_VMDK_IMAGES=y'
 
+packages 'hostapd-wolfssl'
+
 ATH10K_PACKAGES='kmod-ath10k-ct ath10k-firmware-qca9887 ath10k-firmware-qca988x'
 if [ "$GLUON_WLAN_MESH" = 'ibss' ]; then
 	ATH10K_PACKAGES='kmod-ath10k-ct ath10k-firmware-qca9887-ct ath10k-firmware-qca988x-ct'
