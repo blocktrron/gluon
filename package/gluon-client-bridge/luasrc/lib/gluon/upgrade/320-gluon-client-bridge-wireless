@@ -1,6 +1,9 @@
 #!/usr/bin/lua
 
+local site = require 'gluon.site'
 local util = require 'gluon.util'
+
+local platform_info = require 'platform_info'
 
 local uci = require('simple-uci').cursor()
 
@@ -41,7 +44,35 @@ util.foreach_radio(uci, function(radio, index, config)
 		macaddr = macaddr,
 		ifname = suffix and 'client' .. suffix,
 		disabled = disabled or false,
+		encryption = 'none',
 	})
+
+	if ap.owe_enabled(false) and platform_info.get_subtarget() ~= 'tiny' then
+		local owe_macaddr = util.get_wlan_mac(uci, radio, index, 3)
+		if not owe_macaddr then
+			return
+		end
+
+		uci:set('wireless', name, 'owe_transition_bssid', owe_macaddr)
+		uci:set('wireless', name, 'owe_transition_ssid', ap.ssid())
+
+		local owe_name = 'owe_' .. radio_name
+		uci:delete('wireless', owe_name)
+
+		uci:section('wireless', 'wifi-iface', owe_name, {
+			device = radio_name,
+			network = 'client',
+			mode = 'ap',
+			ssid = ap.ssid(),
+			macaddr = owe_macaddr,
+			ifname = suffix and 'owe' .. suffix,
+			disabled = disabled or false,
+			hidden = '1',
+			ieee80211w = '1',
+			encryption = 'owe',
+		})
+	end
+
 end)
 
 uci:save('wireless')
