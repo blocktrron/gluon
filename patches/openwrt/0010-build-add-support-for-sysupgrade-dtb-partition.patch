@@ -1,0 +1,65 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 18 Oct 2018 09:21:45 +0200
+Subject: build: add support for sysupgrade dtb partition
+
+This commit adds support to embed an additional dtb image into the
+sysupgrade .tar. It will be flashed to a seperate partition.
+
+This is needed for mpc85xx bootlaoders without FIT support.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/include/image-commands.mk b/include/image-commands.mk
+index 4d3f025b123f44cfd48d5b6cf081ae7633577277..65fd6517e651ef6302acf45f95b3e2718675aedf 100644
+--- a/include/image-commands.mk
++++ b/include/image-commands.mk
+@@ -248,6 +248,7 @@ define Build/sysupgrade-tar
+ 		--board $(if $(BOARD_NAME),$(BOARD_NAME),$(DEVICE_NAME)) \
+ 		--kernel $(call param_get_default,kernel,$(1),$(IMAGE_KERNEL)) \
+ 		--rootfs $(call param_get_default,rootfs,$(1),$(IMAGE_ROOTFS)) \
++		$(if $(call param_get,dtb,$(1)),--dtb $(call param_get,dtb,$(1))) \
+ 		$@
+ endef
+ 
+diff --git a/scripts/sysupgrade-tar.sh b/scripts/sysupgrade-tar.sh
+index 45b17daccd81587916ea640ab0406f766e2a43de..7cfad0d4579d09c5fd3ae560078fe2556ba3316b 100755
+--- a/scripts/sysupgrade-tar.sh
++++ b/scripts/sysupgrade-tar.sh
+@@ -3,6 +3,7 @@
+ board=""
+ kernel=""
+ rootfs=""
++dtb=""
+ outfile=""
+ err=""
+ 
+@@ -26,6 +27,12 @@ while [ "$1" ]; do
+ 		shift
+ 		continue
+ 		;;
++	"--dtb")
++		dtb="$2"
++		shift
++		shift
++		continue
++		;;
+ 	*)
+ 		if [ ! "$outfile" ]; then
+ 			outfile=$1
+@@ -37,7 +44,7 @@ while [ "$1" ]; do
+ done
+ 
+ if [ ! -n "$board" -o ! -r "$kernel" -a  ! -r "$rootfs" -o ! "$outfile" ]; then
+-	echo "syntax: $0 [--board boardname] [--kernel kernelimage] [--rootfs rootfs] out"
++	echo "syntax: $0 [--board boardname] [--kernel kernelimage] [--rootfs rootfs] [--dtb dtb] out"
+ 	exit 1
+ fi
+ 
+@@ -55,6 +62,7 @@ mkdir -p "${tmpdir}/sysupgrade-${board}"
+ echo "BOARD=${board}" > "${tmpdir}/sysupgrade-${board}/CONTROL"
+ [ -z "${rootfs}" ] || cp "${rootfs}" "${tmpdir}/sysupgrade-${board}/root"
+ [ -z "${kernel}" ] || cp "${kernel}" "${tmpdir}/sysupgrade-${board}/kernel"
++[ -z "${dtb}" ] || cp "${dtb}" "${tmpdir}/sysupgrade-${board}/dtb"
+ 
+ mtime=""
+ if [ -n "$SOURCE_DATE_EPOCH" ]; then

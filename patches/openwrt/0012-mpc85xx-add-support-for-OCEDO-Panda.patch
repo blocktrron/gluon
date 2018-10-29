@@ -1,0 +1,664 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 18 Oct 2018 10:17:54 +0200
+Subject: mpc85xx: add support for OCEDO Panda
+
+CPU:   FSL P1020 (2x 800MHz E500 PPC)
+RAM:   1GB DDR3
+FLASH: 256MiB NAND
+WiFi:  2x Atheros AR9382 2x2:2 abgn
+ETH:   2x BCM54616S - 1x BCM53128 8-port switch
+LED:   5x LEDs (Power, WiFi1, WiFi2, N/D, SYS)
+BTN:   1x RESET
+
+Installation
+------------
+
+1. Download initrams kernel image, dtb binary and sysupgrade image.
+
+2. Place initramfs kernel into tftp root directory. Rename to
+"panda-uimage-factory".
+
+3. Place dtb binary into tftp root directory. Rename to "panda.fdt".
+
+4. Start tftp server on 192.168.100.8/24.
+
+5. Power up the device with the reset button pressed. It will download
+the initrams and dtb via tftp and boot into OpenWRT in RAM.
+
+6. SSH into the device and remove the factory partitions.
+
+ > ubirmvol /dev/ubi0 --name=kernel1
+ > ubirmvol /dev/ubi0 --name=rootfs1
+ > ubirmvol /dev/ubi0 --name=devicetree1
+
+You will have around 60 MiB of free space with that.
+
+You can also delete "kernel2", "devicetree2", "rootfs2" and "storage"
+respectively in case you do not want to go back to the vendor firmware.
+
+7. Modify the U-Boot bootcmd to allow for booting OpenWRT
+
+ > fw_setenv bootcmd_owrt "ubi part ubi && ubi read 0x1000000 kernel
+   && ubi read 0x2000000 devicetree && bootm 0x1000000 - 0x2000000"
+
+ > fw_setenv bootcmd "run bootcmd_owrt"
+
+8. Transfer the sysupgrade image via scp into the /tmp directory.
+
+9. Upgrade the device
+
+ > sysupgrade -n /tmp/<imagename>
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/boot/uboot-envtools/files/mpc85xx b/package/boot/uboot-envtools/files/mpc85xx
+new file mode 100644
+index 0000000000000000000000000000000000000000..3bc70922a7a02837cacc6660683c6ba4154ad91c
+--- /dev/null
++++ b/package/boot/uboot-envtools/files/mpc85xx
+@@ -0,0 +1,25 @@
++#!/bin/sh
++#
++# Copyright (C) 2011-2014 OpenWrt.org
++#
++
++[ -e /etc/config/ubootenv ] && exit 0
++
++touch /etc/config/ubootenv
++
++. /lib/uboot-envtools.sh
++. /lib/functions.sh
++
++board=$(board_name)
++
++case "$board" in
++ocedo,panda)
++	ubootenv_add_uci_config "/dev/mtd1" "0x0" "0x20000" "0x20000"
++	ubootenv_add_uci_config "/dev/mtd2" "0x0" "0x20000" "0x20000"
++	;;
++esac
++
++config_load ubootenv
++config_foreach ubootenv_add_app_config ubootenv
++
++exit 0
+diff --git a/target/linux/mpc85xx/base-files/etc/board.d/02_network b/target/linux/mpc85xx/base-files/etc/board.d/02_network
+index 19f01a658970e497943baefb9bc41d2dd07f5c74..d6b4eebf14826dcadc72c033c66712a18373a0ce 100755
+--- a/target/linux/mpc85xx/base-files/etc/board.d/02_network
++++ b/target/linux/mpc85xx/base-files/etc/board.d/02_network
+@@ -13,6 +13,11 @@ case "$board" in
+ aerohive,hiveap-330)
+ 	ucidef_set_interfaces_lan_wan "eth1" "eth0"
+ 	;;
++ocedo,panda)
++	ucidef_set_interface_wan "eth1"
++	ucidef_add_switch "switch0" \
++		"0:lan" "1:lan" "2:lan" "3:lan" "4:lan" "5:lan" "6:lan" "7:lan" "8u@eth0"
++	;;
+ tplink,tl-wdr4900-v1)
+ 	ucidef_add_switch "switch0" \
+ 		"0@eth0" "2:lan:1" "3:lan:2" "4:lan:3" "5:lan:4" "1:wan"
+diff --git a/target/linux/mpc85xx/base-files/etc/diag.sh b/target/linux/mpc85xx/base-files/etc/diag.sh
+index 3d56d14b08d2d9814a91493ab25e87a9f29073ac..60f60c0b004fce95e6143a67bbd160222c199a76 100644
+--- a/target/linux/mpc85xx/base-files/etc/diag.sh
++++ b/target/linux/mpc85xx/base-files/etc/diag.sh
+@@ -9,6 +9,9 @@ get_status_led() {
+ 	aerohive,hiveap-330)
+ 		status_led="hiveap-330:green:tricolor0"
+ 		;;
++	ocedo,panda)
++		status_led="panda:blue:system"
++		;;
+ 	tplink,tl-wdr4900-v1)
+ 		status_led="tp-link:blue:system"
+ 		;;
+diff --git a/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac b/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
+new file mode 100644
+index 0000000000000000000000000000000000000000..5affff07f3fc70e1ee5e1c171bdf051473c612e8
+--- /dev/null
++++ b/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
+@@ -0,0 +1,22 @@
++#!/bin/ash
++
++[ "$ACTION" == "add" ] || exit 0
++
++PHYNBR=${DEVPATH##*/phy}
++
++[ -n $PHYNBR ] || exit 0
++
++. /lib/functions.sh
++. /lib/functions/system.sh
++
++board=$(board_name)
++
++case "$board" in
++	ocedo,panda)
++		WMAC=wmac$(($PHYNBR + 1))
++		MAC=$(mtd_get_mac_ascii uboot-env0 ${WMAC})
++		echo ${MAC} > /sys${DEVPATH}/macaddress
++		;;
++	*)
++		;;
++esac
+diff --git a/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh b/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
+index 1108b3fd6ed9366e8138f0d9df31ed1a44c42ba3..775ce56c27755c767d2c7a2147d2d48f5a4f1e5d 100755
+--- a/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
++++ b/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
+@@ -9,4 +9,13 @@ platform_check_image() {
+ 	return 0
+ }
+ 
+-# use default for platform_do_upgrade()
++platform_do_upgrade() {
++	case "$(board_name)" in
++	ocedo,panda)
++		nand_do_upgrade "$1"
++		;;
++	*)
++		default_do_upgrade "$ARGV"
++		;;
++	esac
++}
+diff --git a/target/linux/mpc85xx/files/arch/powerpc/boot/dts/panda.dts b/target/linux/mpc85xx/files/arch/powerpc/boot/dts/panda.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..1670dbe76dd06d62c394cfa292282ac046720b81
+--- /dev/null
++++ b/target/linux/mpc85xx/files/arch/powerpc/boot/dts/panda.dts
+@@ -0,0 +1,269 @@
++/*
++ * OCEDO Panda Device Tree Source
++ * based on Aerohive HiveAP-330 Device Tree Source
++ *
++ * Copyright (C) 2017 Chris Blake <chrisrblake93@gmail.com>
++ * Copyright (C) 2018 David Bauer <mail@david-bauer.net>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++/include/ "fsl/p1020si-pre.dtsi"
++/ {
++	model = "OCEDO Panda";
++	compatible = "ocedo,panda";
++
++	chosen {
++		bootargs-override = "console=ttyS0,115200 ubi.mtd=3,2048";
++	};
++
++	memory {
++		device_type = "memory";
++	};
++
++	board_lbc: lbc: localbus@ffe05000 {
++		reg = <0 0xffe05000 0 0x1000>;
++		ranges = <0x0 0x0 0x0 0xec000000 0x04000000
++			  0x1 0x0 0x0 0xff800000 0x00040000
++			  0x2 0x0 0x0 0xffa00000 0x00020000
++			  0x3 0x0 0x0 0xffb00000 0x00020000>;
++
++		nand@1,0 {
++			#address-cells = <0x1>;
++			#size-cells = <0x1>;
++			compatible = "fsl,p1020-fcm-nand", "fsl,elbc-fcm-nand";
++			reg = <0x1 0x0 0x40000>;
++
++			partition@0 {
++				reg = <0x0 0xa0000>;
++				label = "uboot";
++				read-only;
++			};
++
++			partition@a0000 {
++				reg = <0xa0000 0x20000>;
++				label = "uboot-env0";
++			};
++
++			partition@c0000 {
++				reg = <0xc0000 0x40000>;
++				label = "uboot-env1";
++			};
++
++			partition@ {
++				reg = < 0x100000 0xff00000>;
++				label = "ubi";
++			};
++		};
++	};
++
++	board_soc: soc: soc@ffe00000 {
++		ranges = <0x0 0x0 0xffe00000 0x100000>;
++
++		i2c@3000 {
++			rtc@68 {
++				compatible = "dallas,ds1339";
++				reg = <0x68>;
++			};
++		};
++
++		gpio0: gpio-controller@fc00 {
++		};
++
++		mdio@24000 {
++			phy0: ethernet-phy@8 {
++				reg = <0x8>;
++			};
++
++			phy1: ethernet-phy@9 {
++				reg = <0x9>;
++			};
++
++			switch0: ethernet-phy@0 {
++				reg = <0x0>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					lan@0 {
++						reg = <0>;
++						label = "lan1";
++					};
++
++					lan@1 {
++						reg = <1>;
++						label = "lan2";
++					};
++
++					lan@2 {
++						reg = <2>;
++						label = "lan3";
++					};
++
++					lan@3 {
++						reg = <3>;
++						label = "lan4";
++					};
++
++					lan@4 {
++						reg = <4>;
++						label = "lan5";
++					};
++
++					lan@5 {
++						reg = <5>;
++						label = "lan6";
++					};
++
++					lan@6 {
++						reg = <6>;
++						label = "lan7";
++					};
++
++					lan@7 {
++						reg = <7>;
++						label = "lan8";
++					};
++
++					cpu@8 {
++						reg = <8>;
++						label = "cpu";
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++						};
++					};
++				};
++			};
++
++			tbiphy0: tbi-phy@11 {
++				reg = <0x11>;
++			};
++		};
++
++		mdio@25000 {
++			tbiphy1: tbi-phy@11 {
++				reg = <0x11>;
++			};
++		};
++
++		mdio@26000 {
++			tbiphy2: tbi-phy@11 {
++				reg = <0x11>;
++			};
++		};
++
++		enet0: ethernet@b0000 {
++			status = "okay";
++			phy-connection-type = "rgmii-id";
++
++			phy-handle = <&switch0>;
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
++
++		enet1: ethernet@b1000 {
++			status = "okay";
++			phy-handle = <&phy0>;
++			phy-connection-type = "sgmii";
++			tbi-handle = <&tbiphy1>;
++		};
++
++		enet2: ethernet@b2000 {
++			status = "okay";
++			phy-handle = <&phy1>;
++			phy-connection-type = "sgmii";
++			tbi-handle = <&tbiphy2>;
++		};
++
++		usb@22000 {
++			phy_type = "ulpi";
++			dr_mode = "host";
++		};
++
++		usb@23000 {
++			status = "disabled";
++		};
++	};
++
++	pci0: pcie@ffe09000 {
++		ranges = <0x2000000 0x0 0xa0000000 0 0xa0000000 0x0 0x20000000
++			  0x1000000 0x0 0x00000000 0 0xffc10000 0x0 0x10000>;
++		reg = <0 0xffe09000 0 0x1000>;
++		pcie@0 {
++			ranges = <0x2000000 0x0 0xa0000000
++				  0x2000000 0x0 0xa0000000
++				  0x0 0x20000000
++
++				  0x1000000 0x0 0x0
++				  0x1000000 0x0 0x0
++				  0x0 0x100000>;
++		};
++	};
++
++	pci1: pcie@ffe0a000 {
++		reg = <0 0xffe0a000 0 0x1000>;
++		ranges = <0x2000000 0x0 0x80000000 0 0x80000000 0x0 0x20000000
++			  0x1000000 0x0 0x00000000 0 0xffc00000 0x0 0x10000>;
++		pcie@0 {
++			ranges = <0x2000000 0x0 0x80000000
++				  0x2000000 0x0 0x80000000
++				  0x0 0x20000000
++
++				  0x1000000 0x0 0x0
++				  0x1000000 0x0 0x0
++				  0x0 0x100000>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led1 {
++			gpios = <&gpio0 0 0>;
++			label = "panda:green:power";
++			default-state = "on";
++		};
++
++		led2 {
++			gpios = <&gpio0 1 0>;
++			label = "panda:yellow:wlan0";
++			linux,default-trigger = "phy0tpt";
++		};
++
++		led3 {
++			gpios = <&gpio0 2 0>;
++			label = "panda:red:wlan1";
++			linux,default-trigger = "phy1tpt";
++		};
++
++		led4 {
++			gpios = <&gpio0 3 0>;
++			label = "panda:orange:tbd";
++		};
++
++		led5 {
++			gpios = <&gpio0 4 0>;
++			label = "panda:blue:system";
++		};
++	};
++
++	buttons {
++		compatible = "gpio-keys";
++
++		reset {
++			label = "Reset button";
++			gpios = <&gpio0 6 1>;
++			linux,code = <0x198>;
++		};
++	};
++};
++/include/ "fsl/p1020si-post.dtsi"
+diff --git a/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/panda.c b/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/panda.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3a92bceaaa73a595b82570602f364665fcaf968
+--- /dev/null
++++ b/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/panda.c
+@@ -0,0 +1,91 @@
++/*
++ * OCEDO Panda Board Setup
++ * based on AeroHive HiveAP-330 setup
++ *
++ * Copyright (C) 2017 Chris Blake <chrisrblake93@gmail.com>
++ * Copyright (C) 2018 David Bauer <mail@david-bauer.net>
++ *
++ * Based on:
++ *   mpc85xx_rdb.c:
++ *      MPC85xx RDB Board Setup
++ *      Copyright 2013 Freescale Semiconductor Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/stddef.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/of_platform.h>
++
++#include <asm/time.h>
++#include <asm/machdep.h>
++#include <asm/pci-bridge.h>
++#include <mm/mmu_decl.h>
++#include <asm/prom.h>
++#include <asm/udbg.h>
++#include <asm/mpic.h>
++
++#include <sysdev/fsl_soc.h>
++#include <sysdev/fsl_pci.h>
++#include "smp.h"
++
++#include "mpc85xx.h"
++
++void __init panda_pic_init(void)
++{
++	struct mpic *mpic;
++
++	mpic = mpic_alloc(NULL, 0,
++	  MPIC_BIG_ENDIAN |
++	  MPIC_SINGLE_DEST_CPU,
++	  0, 256, " OpenPIC  ");
++
++	BUG_ON(mpic == NULL);
++	mpic_init(mpic);
++}
++
++/*
++ * Setup the architecture
++ */
++static void __init panda_setup_arch(void)
++{
++	if (ppc_md.progress)
++		ppc_md.progress("panda_setup_arch()", 0);
++
++	mpc85xx_smp_init();
++
++	fsl_pci_assign_primary();
++
++	printk(KERN_INFO "Panda board from OCEDO\n");
++}
++
++machine_arch_initcall(panda, mpc85xx_common_publish_devices);
++
++/*
++ * Called very early, device-tree isn't unflattened
++ */
++static int __init panda_probe(void)
++{
++	if (of_machine_is_compatible("ocedo,panda"))
++		return 1;
++	return 0;
++}
++
++define_machine(panda) {
++	.name			= "P1020 RDB",
++	.probe			= panda_probe,
++	.setup_arch		= panda_setup_arch,
++	.init_IRQ		= panda_pic_init,
++#ifdef CONFIG_PCI
++	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
++	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
++#endif
++	.get_irq		= mpic_get_irq,
++	.calibrate_decr		= generic_calibrate_decr,
++	.progress		= udbg_progress,
++};
+diff --git a/target/linux/mpc85xx/image/Makefile b/target/linux/mpc85xx/image/Makefile
+index 4dd1f17321e1584c7e32701671ceacded85bf260..88de13f643d2e617400fc23c1bfee8057a1c44aa 100644
+--- a/target/linux/mpc85xx/image/Makefile
++++ b/target/linux/mpc85xx/image/Makefile
+@@ -64,6 +64,20 @@ define Device/hiveap-330
+ endef
+ TARGET_DEVICES += hiveap-330
+ 
++define Device/panda
++  DEVICE_TITLE := OCEDO Panda
++  DEVICE_PACKAGES := kmod-ath9k kmod-usb-core kmod-usb2 kmod-rtc-ds1307 uboot-envtools wpad-mini
++  BLOCKSIZE := 128k
++  PAGESIZE := 2048
++  SUBPAGESIZE := 512
++  SUPPORTED_DEVICES := ocedo,panda
++  KERNEL_NAME := zImage
++  IMAGES := fdt.bin sysupgrade.bin
++  IMAGE/sysupgrade.bin := sysupgrade-tar dtb=$$(KDIR)/image-$$(DEVICE_DTS).dtb | append-metadata
++  IMAGE/fdt.bin := append-dtb
++endef
++TARGET_DEVICES += panda
++
+ endif
+ 
+ $(eval $(call BuildImage))
+diff --git a/target/linux/mpc85xx/p1020/config-default b/target/linux/mpc85xx/p1020/config-default
+index fd9433b59a0e218d682d73a87e0c6278d6fb1f2d..4069dfd057d3ce266f409d7e54ddf3d2332f5060 100644
+--- a/target/linux/mpc85xx/p1020/config-default
++++ b/target/linux/mpc85xx/p1020/config-default
+@@ -1,13 +1,16 @@
+ CONFIG_ARCH_HAS_TICK_BROADCAST=y
+ CONFIG_AT803X_PHY=y
++CONFIG_BROADCOM_PHY=y
+ CONFIG_CMDLINE_OVERRIDE=y
+ CONFIG_CPU_RMAP=y
+ CONFIG_EEPROM_LEGACY=y
++CONFIG_FSL_CORENET_CF=y
+ CONFIG_GENERIC_CLOCKEVENTS_BROADCAST=y
+ CONFIG_GENERIC_TBSYNC=y
+ # CONFIG_GPIO_MAX77620 is not set
+ CONFIG_HAVE_RCU_TABLE_FREE=y
+ CONFIG_HIVEAP_330=y
++CONFIG_PANDA=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_LEDS_LP5521=y
+ CONFIG_LEDS_LP55XX_COMMON=y
+@@ -16,7 +19,17 @@ CONFIG_LOCK_SPIN_ON_OWNER=y
+ CONFIG_MFD_CORE=y
+ CONFIG_MFD_MAX77620=y
+ CONFIG_MTD_CFI=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ECC=y
++CONFIG_MTD_NAND_FSL_ELBC=y
++CONFIG_MTD_NAND_FSL_IFC=y
+ CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_BEB_LIMIT=20
++CONFIG_MTD_UBI_BLOCK=y
++# CONFIG_MTD_UBI_FASTMAP is not set
++# CONFIG_MTD_UBI_GLUEBI is not set
++CONFIG_MTD_UBI_WL_THRESHOLD=4096
+ CONFIG_MUTEX_SPIN_ON_OWNER=y
+ CONFIG_NET_FLOW_LIMIT=y
+ CONFIG_NR_CPUS=2
+@@ -28,5 +41,15 @@ CONFIG_RPS=y
+ # CONFIG_RTC_DRV_MAX77686 is not set
+ CONFIG_RWSEM_SPIN_ON_OWNER=y
+ CONFIG_SMP=y
++CONFIG_SWCONFIG_B53=y
++# CONFIG_SWCONFIG_B53_MMAP_DRIVER is not set
++CONFIG_SWCONFIG_B53_PHY_DRIVER=y
++# CONFIG_SWCONFIG_B53_PHY_FIXUP is not set
++# CONFIG_SWCONFIG_B53_SPI_DRIVER is not set
++# CONFIG_SWCONFIG_B53_SRAB_DRIVER is not set
+ CONFIG_TREE_RCU=y
++CONFIG_UBIFS_FS=y
++CONFIG_UBIFS_FS_ADVANCED_COMPR=y
++CONFIG_UBIFS_FS_LZO=y
++CONFIG_UBIFS_FS_ZLIB=y
+ CONFIG_XPS=y
+diff --git a/target/linux/mpc85xx/p1020/target.mk b/target/linux/mpc85xx/p1020/target.mk
+index 5d84d832056748643892ce9182d036687c25e5c3..a0d1091f80230500e9bea0507c805c203af00eea 100644
+--- a/target/linux/mpc85xx/p1020/target.mk
++++ b/target/linux/mpc85xx/p1020/target.mk
+@@ -1,5 +1,5 @@
+ BOARDNAME:=P1020
+-FEATURES += ramdisk
++FEATURES += ramdisk nand
+ 
+ define Target/Description
+ 	Build firmware images for Freescale P1020 based boards.
+diff --git a/target/linux/mpc85xx/patches-4.9/104-powerpc-85xx-panda-support.patch b/target/linux/mpc85xx/patches-4.9/104-powerpc-85xx-panda-support.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b0f8756f2063c9ef3a033857c36283d81a07b1a
+--- /dev/null
++++ b/target/linux/mpc85xx/patches-4.9/104-powerpc-85xx-panda-support.patch
+@@ -0,0 +1,34 @@
++Index: linux-4.14.77/arch/powerpc/platforms/85xx/Kconfig
++===================================================================
++--- linux-4.14.77.orig/arch/powerpc/platforms/85xx/Kconfig
+++++ linux-4.14.77/arch/powerpc/platforms/85xx/Kconfig
++@@ -60,6 +60,17 @@ config HIVEAP_330
++       This board is a Concurrent Dual-Band wireless access point with a
++       Freescale P1020 SoC.
++ 
+++config PANDA
+++	bool "OCEDO PANDA"
+++	select DEFAULT_UIMAGE
+++	select ARCH_REQUIRE_GPIOLIB
+++	select GPIO_MPC8XXX
+++	help
+++	  This option enables support for the OCEDO PANDA board.
+++
+++	  This board is a Concurrent Dual-Band wireless access point with a
+++	  Freescale P1020 SoC.
+++
++ config MPC8540_ADS
++ 	bool "Freescale MPC8540 ADS"
++ 	select DEFAULT_UIMAGE
++Index: linux-4.14.77/arch/powerpc/platforms/85xx/Makefile
++===================================================================
++--- linux-4.14.77.orig/arch/powerpc/platforms/85xx/Makefile
+++++ linux-4.14.77/arch/powerpc/platforms/85xx/Makefile
++@@ -11,6 +11,7 @@ obj-$(CONFIG_BSC9131_RDB) += bsc913x_rdb
++ obj-$(CONFIG_BSC9132_QDS) += bsc913x_qds.o
++ obj-$(CONFIG_C293_PCIE)   += c293pcie.o
++ obj-$(CONFIG_HIVEAP_330) += hiveap-330.o
+++obj-$(CONFIG_PANDA)       += panda.o
++ obj-$(CONFIG_MPC8540_ADS) += mpc85xx_ads.o
++ obj-$(CONFIG_MPC8560_ADS) += mpc85xx_ads.o
++ obj-$(CONFIG_MPC85xx_CDS) += mpc85xx_cds.o
