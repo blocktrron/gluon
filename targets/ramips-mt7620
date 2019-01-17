@@ -15,3 +15,7 @@ device nexx-wt3020-8m wt3020-8M
 alias nexx-wt3020ad
 alias nexx-wt3020f
 alias nexx-wt3020h
+
+# TP-Link
+device tp-link-archer-c20-v1 tplink_c2-v1
+factory
