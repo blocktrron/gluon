@@ -1,0 +1,612 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Tue, 8 Jan 2019 01:20:56 +0100
+Subject: mpc85xx: add support for Sophos RED 15w Rev.1
+
+Hardware
+========
+CPU:  Freescale P1010 PowerPC
+RAM:  128M DDR3
+NAND: 128MiB
+ETH:  RTL8211F SGMII PHY
+      RTL8367B 5-port RGMII switch
+      (not connected to SoC - unmanaged)
+WiFi: SparkLan WPEA-121N
+       - Atheros AR9382 2T2R abgn
+USB:  1x USB 2.0
+LED:  System, Router, Internet, Tunnel controllable
+      LAN1-4, WAN, Power non-controllable
+BTN:  None
+
+Installation
+============
+1. Power on the device while attached to the Console port.
+
+2. Halt the U-Boot by pressing Enter when prompted.
+
+3. Set the correct bootcmd for booting OpenWRT:
+ > setenv bootargs_owrt "setenv bootargs console=ttyS0,115200"
+ > setenv bootcmd "run bootargs_owrt;
+   nand read 0x1000000 0x300000 0x800000;
+   bootm 0x1000000;"
+ > saveenv
+
+5. Rename OpenWRT initramfs image to 'kernel.bin' and place it in a
+   TFTP server root-directory served on 192.168.1.2/24. Connect your
+   computer to one of the LAN-ports.
+
+4. Boot OpenWRT initramfs image with
+ > run bootargs_owrt; tftpboot 0x1000000 192.168.1.2:kernel.bin;
+   bootm 0x1000000;
+
+6. (Optional)
+   Make a Backup of 'sophos-os1', 'sophos-os2' and 'sophos-data' in case
+   you ever want to go back to the vendor firmware.
+
+7. Create Ubi Volume on mtd4 by executing
+ > ubiformat /dev/mtd4 -y
+
+8. Transfer OpenWRT sysupgrade image to the device via SCP and install it
+   with
+ > sysupgrade -n <openwrt-image-file>
+
+Back to Stock
+=============
+If you want to go back to the stock firmware, here is the bootcmd of the
+vendor firmware:
+ > setenv bootargs console=ttyS0,115200 root=/dev/mtdblock5;
+   nand read 0xc00000 0x00300000  0x100000;
+   nand read 0x1000000 0x00400000 0x00800000;
+   bootm 0x1000000 - 0xc00000
+
+Set it via 'setenv' from the U-Boot shell and don't forget to save it
+using 'saveenv'!
+
+After this, boot the OpenWRT initramfs image just like you would for
+installation. Write back the three vendor partitions using mtd. Reboot
+the device afterwards.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+[refresh and reorder patches]
+Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
+
+diff --git a/target/linux/mpc85xx/Makefile b/target/linux/mpc85xx/Makefile
+index 552f16e82ff14778d2dc9f38a259523463e195b0..0affc38f611af12aa287521d1e349c6432e3c40b 100644
+--- a/target/linux/mpc85xx/Makefile
++++ b/target/linux/mpc85xx/Makefile
+@@ -10,7 +10,7 @@ ARCH:=powerpc
+ BOARD:=mpc85xx
+ BOARDNAME:=Freescale MPC85xx
+ CPU_TYPE:=8540
+-FEATURES:=squashfs
++FEATURES:=squashfs ramdisk
+ MAINTAINER:=Imre Kaloz <kaloz@openwrt.org>
+ SUBTARGETS:=generic p1020
+ 
+diff --git a/target/linux/mpc85xx/base-files/etc/diag.sh b/target/linux/mpc85xx/base-files/etc/diag.sh
+index 3d56d14b08d2d9814a91493ab25e87a9f29073ac..e344d4b7564a6431d67ed4f84ebd8a3594f92b66 100644
+--- a/target/linux/mpc85xx/base-files/etc/diag.sh
++++ b/target/linux/mpc85xx/base-files/etc/diag.sh
+@@ -9,6 +9,9 @@ get_status_led() {
+ 	aerohive,hiveap-330)
+ 		status_led="hiveap-330:green:tricolor0"
+ 		;;
++	sophos,red-15w-rev1)
++		status_led="red-15w-rev1:green:system"
++		;;
+ 	tplink,tl-wdr4900-v1)
+ 		status_led="tp-link:blue:system"
+ 		;;
+diff --git a/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac b/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
+new file mode 100644
+index 0000000000000000000000000000000000000000..3092cebfc9ba17427a3ee77cd5cd18c90d280855
+--- /dev/null
++++ b/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
+@@ -0,0 +1,20 @@
++#!/bin/ash
++
++[ "$ACTION" == "add" ] || exit 0
++
++PHYNBR=${DEVPATH##*/phy}
++
++[ -n $PHYNBR ] || exit 0
++
++. /lib/functions.sh
++. /lib/functions/system.sh
++
++board=$(board_name)
++
++case "$board" in
++sophos,red-15w-rev1)
++	echo $(mtd_get_mac_ascii u-boot-env ethaddr) > /sys${DEVPATH}/macaddress
++	;;
++*)
++	;;
++esac
+diff --git a/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh b/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
+index 1108b3fd6ed9366e8138f0d9df31ed1a44c42ba3..9f49d0ddcefd92a38aaab5f4a93cc484324ae763 100755
+--- a/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
++++ b/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
+@@ -9,4 +9,15 @@ platform_check_image() {
+ 	return 0
+ }
+ 
+-# use default for platform_do_upgrade()
++platform_do_upgrade() {
++	local board=$(board_name)
++
++	case "$board" in
++	sophos,red-15w-rev1)
++		nand_do_upgrade "$ARGV"
++		;;
++	*)
++		default_do_upgrade "$ARGV"
++		;;
++	esac
++}
+diff --git a/target/linux/mpc85xx/config-4.14 b/target/linux/mpc85xx/config-4.14
+index 5bed475664b354b16b41a653314f3be5d5f01e67..b60133e30e6919adef549110ae272b8467837ec5 100644
+--- a/target/linux/mpc85xx/config-4.14
++++ b/target/linux/mpc85xx/config-4.14
+@@ -306,6 +306,7 @@ CONFIG_QUICC_ENGINE=y
+ CONFIG_RAS=y
+ # CONFIG_RCU_NEED_SEGCBLIST is not set
+ # CONFIG_RCU_STALL_COMMON is not set
++# CONFIG_RED_15W_REV1 is not set
+ CONFIG_REGMAP=y
+ CONFIG_REGMAP_I2C=y
+ CONFIG_REGMAP_SPI=y
+diff --git a/target/linux/mpc85xx/config-4.19 b/target/linux/mpc85xx/config-4.19
+index 0aaefe84ea1000dd2a3e4c063799f040d1142ece..006a9d34c4c34373c28655c7ca3a568f1027d6b5 100644
+--- a/target/linux/mpc85xx/config-4.19
++++ b/target/linux/mpc85xx/config-4.19
+@@ -269,6 +269,7 @@ CONFIG_QE_GPIO=y
+ CONFIG_QE_USB=y
+ CONFIG_QUICC_ENGINE=y
+ CONFIG_RAS=y
++# CONFIG_RED_15W_REV1 is not set
+ CONFIG_REGMAP=y
+ CONFIG_REGMAP_I2C=y
+ CONFIG_REGMAP_SPI=y
+diff --git a/target/linux/mpc85xx/files/arch/powerpc/boot/dts/red-15w-rev1.dts b/target/linux/mpc85xx/files/arch/powerpc/boot/dts/red-15w-rev1.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..600426bb6e1e16a5104a018315bb150314ee1554
+--- /dev/null
++++ b/target/linux/mpc85xx/files/arch/powerpc/boot/dts/red-15w-rev1.dts
+@@ -0,0 +1,207 @@
++// SPDX-License-Identifier: GPL-2.0-or-later or MIT
++
++/include/ "fsl/p1010si-pre.dtsi"
++
++/ {
++	model = "Sophos RED 15w Rev.1";
++	compatible = "sophos,red-15w-rev1";
++
++	memory {
++		device_type = "memory";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		system_green {
++			gpios = <&gpio0 7 0>;
++			label = "red-15w-rev1:green:system";
++		};
++
++		system_red {
++			gpios = <&gpio0 3 0>;
++			label = "red-15w-rev1:red:system";
++		};
++
++		router {
++			gpios = <&gpio0 5 1>;
++			label = "red-15w-rev1:green:router";
++		};
++
++		internet {
++			gpios = <&gpio0 4 1>;
++			label = "red-15w-rev1:green:internet";
++		};
++
++		tunnel {
++			gpios = <&gpio0 8 1>;
++			label = "red-15w-rev1:green:tunnel";
++		};
++	};
++
++	soc: soc@ffe00000 {
++		ranges = <0x0 0x0 0xffe00000 0x100000>;
++
++		i2c@3000 {
++			eeprom@50 {
++				compatible = "st,24c256";
++				reg = <0x50>;
++			};
++		};
++
++		i2c@3100 {
++			eeprom@52 {
++				compatible = "atmel,24c01";
++				reg = < 0x52 >;
++			};
++		};
++
++		gpio0: gpio-controller@fc00 {
++		};
++
++		usb@22000 {
++			phy_type = "utmi";
++			dr_mode = "host";
++		};
++
++		mdio@24000 {
++			phy0: ethernet-phy@0 {
++				reg = <0x0>;
++			};
++		};
++
++		mdio@25000 {
++			tbi_phy: tbi-phy@11 {
++				reg = <0x11>;
++			};
++		};
++
++		mdio@26000 {
++			status = "disabled";
++		};
++
++		enet0: ethernet@b0000 {
++			phy-connection-type = "rgmii-id";
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
++
++		enet1: ethernet@b1000 {
++			phy-handle = <&phy0>;
++			phy-connection-type = "sgmii";
++
++			tbi-handle = <&tbi_phy>;
++		};
++
++		enet2: ethernet@b2000 {
++			status = "disabled";
++		};
++
++		sdhc@2e000 {
++			status = "disabled";
++		};
++	};
++
++	ifc: ifc@ffe1e000 {
++		reg = <0x0 0xffe1e000 0 0x2000>;
++
++		/* NOR, NAND Flashes and CPLD on board */
++		ranges = <0x0 0x0 0x0 0xee000000 0x02000000
++			0x1 0x0 0x0 0xff800000 0x00010000
++			0x3 0x0 0x0 0xffb00000 0x00000020>;
++
++		nand@1,0 {
++			compatible = "fsl,ifc-nand";
++			reg = <0x1 0x0 0x10000>;
++
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				/*
++				 * Original partition layout:
++				 * 0x000000000000-0x000000100000 : "NAND U-Boot Image"
++				 * 0x000000100000-0x000000200000 : "NAND U-Boot Environment"
++				 * 0x000000200000-0x000000300000 : "Provisioning"
++				 *  - OS-Image 1
++				 * 0x000000300000-0x000000400000 : "fdt1"
++				 * 0x000000400000-0x000000c00000 : "uimage1"
++				 * 0x000000c00000-0x000001c00000 : "rootfs1"
++				 *  - OS-Image 2
++				 * 0x000001c00000-0x000001d00000 : "fdt2"
++				 * 0x000001d00000-0x000002500000 : "uimage2"
++				 * 0x000002500000-0x000003500000 : "rootfs2"
++				 *  - Empty
++				 * 0x000003500000-0x000008000000 : "data"
++				 */
++
++				partition@0 {
++					reg = <0x0 0x100000>;
++					label = "u-boot";
++					read-only;
++				};
++
++				partition@100000 {
++					reg = <0x100000 0x100000>;
++					label = "u-boot-env";
++				};
++
++				partition@200000 {
++					reg = <0x200000 0x100000>;
++					label = "provisioning";
++					read-only;
++				};
++
++				partition@300000 {
++					reg = <0x300000 0x800000>;
++					label = "kernel";
++				};
++
++				partition@b00000 {
++					reg = <0xb00000 0x7500000>;
++					label = "ubi";
++				};
++
++				oem-partition@300000 {
++					reg = <0x300000 0x1900000>;
++					label = "sophos-os1";
++				};
++
++				oem-partition@1c00000 {
++					reg = <0x1c00000 0x1900000>;
++					label = "sophos-os2";
++				};
++
++				oem-partition@3500000 {
++					reg = <0x3500000 0x4b00000>;
++					label = "sophos-data";
++				};
++			};
++		};
++	};
++
++	pci0: pcie@ffe09000 {
++		status = "disabled";
++	};
++
++	pci1: pcie@ffe0a000 {
++		reg = <0 0xffe0a000 0 0x1000>;
++		ranges = <0x2000000 0x0 0x80000000 0 0x80000000 0x0 0x20000000
++			  0x1000000 0x0 0x00000000 0 0xffc00000 0x0 0x10000>;
++		pcie@0 {
++			ranges = <0x2000000 0x0 0x80000000
++				  0x2000000 0x0 0x80000000
++				  0x0 0x20000000
++
++				  0x1000000 0x0 0x0
++				  0x1000000 0x0 0x0
++				  0x0 0x100000>;
++		};
++	};
++};
++
++/include/ "fsl/p1010si-post.dtsi"
+diff --git a/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/red15w_rev1.c b/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/red15w_rev1.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..6669d5a57eebf1e1a3f4f35dada5b7fb8e719a28
+--- /dev/null
++++ b/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/red15w_rev1.c
+@@ -0,0 +1,87 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++/*
++ * Sophos RED 15w Rev.1 Board Setup
++ *
++ * Copyright (C) 2019 David Bauer <mail@david-bauer.net>
++ *
++ * Based on:
++ *   p1010rdb.c:
++ *      P1010 RDB Board Setup
++ *      Copyright 2011 Freescale Semiconductor Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/stddef.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/of_platform.h>
++
++#include <asm/time.h>
++#include <asm/machdep.h>
++#include <asm/pci-bridge.h>
++#include <mm/mmu_decl.h>
++#include <asm/prom.h>
++#include <asm/udbg.h>
++#include <asm/mpic.h>
++
++#include <sysdev/fsl_soc.h>
++#include <sysdev/fsl_pci.h>
++
++#include "mpc85xx.h"
++
++void __init red_15w_rev1_pic_init(void)
++{
++	struct mpic *mpic;
++
++	mpic = mpic_alloc(NULL, 0,
++	  MPIC_BIG_ENDIAN | MPIC_SINGLE_DEST_CPU,
++	  0, 256, " OpenPIC  ");
++
++	BUG_ON(mpic == NULL);
++	mpic_init(mpic);
++}
++
++/*
++ * Setup the architecture
++ */
++static void __init red_15w_rev1_setup_arch(void)
++{
++	if (ppc_md.progress)
++		ppc_md.progress("red_15w_rev1_setup_arch()", 0);
++
++	fsl_pci_assign_primary();
++
++	pr_info("RED 15w Rev.1 from Sophos\n");
++}
++
++machine_arch_initcall(red_15w_rev1, mpc85xx_common_publish_devices);
++
++/*
++ * Called very early, device-tree isn't unflattened
++ */
++static int __init red_15w_rev1_probe(void)
++{
++	if (of_machine_is_compatible("sophos,red-15w-rev1"))
++		return 1;
++	return 0;
++}
++
++define_machine(red_15w_rev1) {
++	.name			= "P1010 RDB",
++	.probe			= red_15w_rev1_probe,
++	.setup_arch		= red_15w_rev1_setup_arch,
++	.init_IRQ		= red_15w_rev1_pic_init,
++#ifdef CONFIG_PCI
++	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
++	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
++#endif
++	.get_irq		= mpic_get_irq,
++	.calibrate_decr		= generic_calibrate_decr,
++	.progress		= udbg_progress,
++};
+diff --git a/target/linux/mpc85xx/generic/config-default b/target/linux/mpc85xx/generic/config-default
+index 1e5b257b45046bd6c2a1d53a12eb10ef1624201b..c38ffce92fd4569886a0057413bae0588c574c52 100644
+--- a/target/linux/mpc85xx/generic/config-default
++++ b/target/linux/mpc85xx/generic/config-default
+@@ -1,3 +1,19 @@
++# CONFIG_FSL_CORENET_CF is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ECC=y
++CONFIG_MTD_NAND_FSL_IFC=y
+ CONFIG_MTD_SPLIT_FIRMWARE=y
+ CONFIG_MTD_SPLIT_TPLINK_FW=y
++CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_BEB_LIMIT=20
++CONFIG_MTD_UBI_BLOCK=y
++# CONFIG_MTD_UBI_FASTMAP is not set
++# CONFIG_MTD_UBI_GLUEBI is not set
++CONFIG_MTD_UBI_WL_THRESHOLD=4096
++CONFIG_REALTEK_PHY=y
++CONFIG_RED_15W_REV1=y
+ CONFIG_TL_WDR4900_V1=y
++CONFIG_UBIFS_FS=y
++CONFIG_UBIFS_FS_ADVANCED_COMPR=y
++CONFIG_UBIFS_FS_LZO=y
++CONFIG_UBIFS_FS_ZLIB=y
+diff --git a/target/linux/mpc85xx/generic/target.mk b/target/linux/mpc85xx/generic/target.mk
+index 2620a228990a1bcfddb5a8ac8edb5caef3bc651f..82e2b63026953744c52dc2b40e6fc42483727b5f 100644
+--- a/target/linux/mpc85xx/generic/target.mk
++++ b/target/linux/mpc85xx/generic/target.mk
+@@ -1,4 +1,5 @@
+ BOARDNAME:=Generic
++FEATURES+=nand
+ KERNELNAME:=cuImage.tl-wdr4900-v1
+ 
+ define Target/Description
+diff --git a/target/linux/mpc85xx/image/Makefile b/target/linux/mpc85xx/image/Makefile
+index 00eed888740a18460877b492cba59c4d2a31808a..0c249a5131685c75a556fa9d06f2732a1b8c82a8 100644
+--- a/target/linux/mpc85xx/image/Makefile
++++ b/target/linux/mpc85xx/image/Makefile
+@@ -57,6 +57,18 @@ define Device/tl-wdr4900-v1
+ endef
+ TARGET_DEVICES += tl-wdr4900-v1
+ 
++define Device/red-15w-rev1
++  DEVICE_TITLE := Sophos RED 15w Rev.1
++  DEVICE_PACKAGES := kmod-usb2
++  # Original firmware uses a dedicated DTB-partition.
++  # The bootloader however supports FIT-images.
++  KERNEL = kernel-bin | gzip | fit gzip $(KDIR)/image-$$(DEVICE_DTS).dtb
++  SUPPORTED_DEVICES := sophos,red-15w-rev1
++  IMAGES := sysupgrade.bin
++  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
++endef
++TARGET_DEVICES += red-15w-rev1
++
+ endif
+ 
+ ifeq ($(SUBTARGET),p1020)
+diff --git a/target/linux/mpc85xx/p1020/target.mk b/target/linux/mpc85xx/p1020/target.mk
+index 5d84d832056748643892ce9182d036687c25e5c3..000fc6464444aedf2510170edf300865b29c90d4 100644
+--- a/target/linux/mpc85xx/p1020/target.mk
++++ b/target/linux/mpc85xx/p1020/target.mk
+@@ -1,5 +1,4 @@
+ BOARDNAME:=P1020
+-FEATURES += ramdisk
+ 
+ define Target/Description
+ 	Build firmware images for Freescale P1020 based boards.
+diff --git a/target/linux/mpc85xx/patches-4.14/105-powerpc-85xx-red-15w-rev1.patch b/target/linux/mpc85xx/patches-4.14/105-powerpc-85xx-red-15w-rev1.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..42bcd58de02b81c6258319489add90f92dca7c71
+--- /dev/null
++++ b/target/linux/mpc85xx/patches-4.14/105-powerpc-85xx-red-15w-rev1.patch
+@@ -0,0 +1,29 @@
++--- a/arch/powerpc/platforms/85xx/Kconfig
+++++ b/arch/powerpc/platforms/85xx/Kconfig
++@@ -173,6 +173,16 @@ config XES_MPC85xx
++ 	  Manufacturer: Extreme Engineering Solutions, Inc.
++ 	  URL: <http://www.xes-inc.com/>
++ 
+++config RED_15W_REV1
+++	bool "Sophos RED 15w Rev.1"
+++	select DEFAULT_UIMAGE
+++	select ARCH_REQUIRE_GPIOLIB
+++	select GPIO_MPC8XXX
+++	help
+++	  This option enables support for the SOPHOS RED 15w Rev.1 board.
+++
+++	  This board is a wireless VPN router with a Freescale P1010 SoC.
+++
++ config STX_GP3
++ 	bool "Silicon Turnkey Express GP3"
++ 	help
++--- a/arch/powerpc/platforms/85xx/Makefile
+++++ b/arch/powerpc/platforms/85xx/Makefile
++@@ -25,6 +25,7 @@ obj-$(CONFIG_P1023_RDB)   += p1023_rdb.o
++ obj-$(CONFIG_TWR_P102x)   += twr_p102x.o
++ obj-$(CONFIG_CORENET_GENERIC)   += corenet_generic.o
++ obj-$(CONFIG_FB_FSL_DIU)	+= t1042rdb_diu.o
+++obj-$(CONFIG_RED_15W_REV1)	+= red15w_rev1.o
++ obj-$(CONFIG_STX_GP3)	  += stx_gp3.o
++ obj-$(CONFIG_TQM85xx)	  += tqm85xx.o
++ obj-$(CONFIG_TL_WDR4900_V1) += tl_wdr4900_v1.o
+diff --git a/target/linux/mpc85xx/patches-4.19/103-powerpc-85xx-red-15w-rev1.patch b/target/linux/mpc85xx/patches-4.19/103-powerpc-85xx-red-15w-rev1.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..b84a56659cca1e2e589ebbb2aab1bbc397e2c63b
+--- /dev/null
++++ b/target/linux/mpc85xx/patches-4.19/103-powerpc-85xx-red-15w-rev1.patch
+@@ -0,0 +1,29 @@
++--- a/arch/powerpc/platforms/85xx/Kconfig
+++++ b/arch/powerpc/platforms/85xx/Kconfig
++@@ -173,6 +173,16 @@ config XES_MPC85xx
++ 	  Manufacturer: Extreme Engineering Solutions, Inc.
++ 	  URL: <http://www.xes-inc.com/>
++ 
+++config RED_15W_REV1
+++	bool "Sophos RED 15w Rev.1"
+++	select DEFAULT_UIMAGE
+++	select ARCH_REQUIRE_GPIOLIB
+++	select GPIO_MPC8XXX
+++	help
+++	  This option enables support for the Sophos RED 15w Rev.1 board.
+++
+++	  This board is a wireless VPN router with a Freescale P1010 SoC.
+++
++ config STX_GP3
++ 	bool "Silicon Turnkey Express GP3"
++ 	help
++--- a/arch/powerpc/platforms/85xx/Makefile
+++++ b/arch/powerpc/platforms/85xx/Makefile
++@@ -25,6 +25,7 @@ obj-$(CONFIG_P1023_RDB)   += p1023_rdb.o
++ obj-$(CONFIG_TWR_P102x)   += twr_p102x.o
++ obj-$(CONFIG_CORENET_GENERIC)   += corenet_generic.o
++ obj-$(CONFIG_FB_FSL_DIU)	+= t1042rdb_diu.o
+++obj-$(CONFIG_RED_15W_REV1)	+= red15w_rev1.o
++ obj-$(CONFIG_STX_GP3)	  += stx_gp3.o
++ obj-$(CONFIG_TQM85xx)	  += tqm85xx.o
++ obj-$(CONFIG_TL_WDR4900_V1) += tl_wdr4900_v1.o
