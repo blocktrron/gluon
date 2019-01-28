@@ -1,5 +1,5 @@
 ATH10K_PACKAGES_IPQ40XX=
-ATH10K_PACKAGES_QCA9888='ath10k-firmware-qca9888'
+ATH10K_PACKAGES_QCA9888='ath10k-firmware-qca9888 -ath10k-firmware-qca9888-ct'
 if [ "$GLUON_WLAN_MESH" = 'ibss' ]; then
 	ATH10K_PACKAGES_IPQ40XX='-kmod-ath10k kmod-ath10k-ct -ath10k-firmware-qca4019 ath10k-firmware-qca4019-ct'
 	ATH10K_PACKAGES_QCA9888='-ath10k-firmware-qca9888 ath10k-firmware-qca9888-ct'

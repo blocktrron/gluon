@@ -20,12 +20,12 @@ factory
 device alfa-network-ap121f ap121f ap121f
 factory
 
-device alfa-network-hornet-ub hornet-ub HORNETUB
-alias alfa-network-ap121
-alias alfa-network-ap121u
+#device alfa-network-hornet-ub hornet-ub HORNETUB # kernel size?
+#alias alfa-network-ap121
+#alias alfa-network-ap121u
 
-device alfa-network-tube2h tube2h-8M TUBE2H8M
-device alfa-network-n2-n5 alfa-nx ALFANX
+#device alfa-network-tube2h tube2h-8M TUBE2H8M # kernel size?
+#device alfa-network-n2-n5 alfa-nx ALFANX # kernel size?
 
 
 # Allnet
