@@ -1,0 +1,19 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 1 Feb 2019 02:08:43 +0100
+Subject: base-files: re-add get_status_led to diag.sh
+
+diff --git a/package/base-files/files/etc/diag.sh b/package/base-files/files/etc/diag.sh
+index 8eb36c6feb17f0c6c910927194e1df5fa1dd1ff6..aa211048d6fe11fd772a755e0ad451cb2490c11c 100644
+--- a/package/base-files/files/etc/diag.sh
++++ b/package/base-files/files/etc/diag.sh
+@@ -8,6 +8,10 @@ failsafe="$(get_dt_led failsafe)"
+ running="$(get_dt_led running)"
+ upgrade="$(get_dt_led upgrade)"
+ 
++get_status_led() {
++	status_led="$running"
++}
++
+ set_led_state() {
+ 	status_led="$boot"
+ 
