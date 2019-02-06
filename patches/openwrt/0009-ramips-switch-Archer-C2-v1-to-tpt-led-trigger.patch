@@ -1,0 +1,17 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 6 Feb 2019 22:45:00 +0100
+Subject: ramips: switch Archer C2 v1 to tpt led trigger
+
+diff --git a/target/linux/ramips/base-files/etc/board.d/01_leds b/target/linux/ramips/base-files/etc/board.d/01_leds
+index e36f125126270d551c3ca170c58c501e4221424e..15d46f9606e978aa45de3b535b659ecb27eade0d 100755
+--- a/target/linux/ramips/base-files/etc/board.d/01_leds
++++ b/target/linux/ramips/base-files/etc/board.d/01_leds
+@@ -324,7 +324,7 @@ tl-wr841n-v13)
+ tplink,c2-v1)
+ 	ucidef_set_led_switch "lan" "lan" "$boardname:green:lan" "switch1" "0x1e"
+ 	ucidef_set_led_switch "wan" "wan" "$boardname:green:wan" "switch1" "0x01"
+-	set_wifi_led "$boardname:green:wlan"
++	ucidef_set_led_wlan "wlan2g" "wlan2g" "$boardname:green:wlan" "phy0tpt"
+ 	;;
+ tplink,c20-v1)
+ 	ucidef_set_led_switch "lan" "lan" "$boardname:blue:lan" "switch0" "0x1e"
