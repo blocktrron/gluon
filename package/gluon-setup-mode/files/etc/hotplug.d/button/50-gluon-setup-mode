@@ -11,6 +11,10 @@ wait_setup_mode() {
 	reboot
 }
 
+# Don't execute when in setup-mode
+if [ -r /tmp/gluon-setup-mode-active ]; then
+	exit 0
+fi
 
 if [ "$BUTTON" = wps -o "$BUTTON" = reset ]; then
 	case "$ACTION" in
