@@ -1,0 +1,36 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+enable_wifi() {
+	uci_set wireless "$1" disabled "0"
+	wifi
+}
+
+disable_wifi() {
+	uci_set wireless "$1" disabled "1"
+	wifi
+}
+
+# Don't execute when not in setup-mode
+if [! -r /tmp/gluon-setup-mode-active ]; then
+	exit 0
+fi
+
+# Don't execute in case wifi is already active
+if [ -r /tmp/gluon-setup-mode-wifi-active ]; then
+	exit 0
+fi
+
+
+if [ "$BUTTON" = wps -o "$BUTTON" = reset ]; then
+	case "$ACTION" in
+		pressed)
+			touch /tmp/gluon-setup-mode-wifi-active
+			config_foreach enable_wifi wifi-iface
+			sleep 600
+			config_foreach disable_wifi wifi-iface
+			rm /tmp/gluon-setup-mode-wifi-active
+			;;
+	esac
+fi
