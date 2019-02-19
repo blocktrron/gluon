@@ -22,6 +22,7 @@ if [ -r /tmp/gluon-setup-mode-wifi-active ]; then
 	exit 0
 fi
 
+export UCI_CONFIG_DIR=/var/gluon/setup-mode/config
 
 if [ "$BUTTON" = wps -o "$BUTTON" = reset ]; then
 	case "$ACTION" in
