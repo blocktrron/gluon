@@ -26,6 +26,7 @@ add_wifi_iface() {
 	uci_set wireless "setup_$1" ssid 'Gluon Setup'
 	uci_set wireless "setup_$1" encryption 'psk2'
 	uci_set wireless "setup_$1" disabled '1'
+	uci_set wireless "setup_$1" macaddr "$(lua -e 'print(require("gluon.config-mode").get_random_mac())')""
 	uci_set wireless "setup_$1" key "$(lua -e 'print(require("gluon.sysconfig").primary_mac:gsub(":",""):lower())')"
 }
 
