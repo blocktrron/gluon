@@ -2,40 +2,58 @@
 
 . /lib/functions.sh
 
+PID=
+
+# Only engage on WPS, RESET or WiFi button
+[ ! "$BUTTON" = wps -o "$BUTTON" = reset ] && return 0
+
+# Don't execute when not in setup-mode
+[ ! -r /tmp/gluon-setup-mode-active ] && return 0
+
 export UCI_CONFIG_DIR=/var/gluon/setup-mode/config
 config_load wireless
 
-enable_wifi() {
+enable_wifi_iface() {
 	uci_set wireless "$1" disabled "0"
 }
 
-disable_wifi() {
+disable_wifi_iface() {
 	uci_set wireless "$1" disabled "1"
 }
 
-# Don't execute when not in setup-mode
-if [! -r /tmp/gluon-setup-mode-active ]; then
-	exit 0
-fi
+wait_disable_wifi() {
+	sleep 300
+	disable_wifi
+}
 
-# Don't execute in case wifi is already active
+disable_wifi() {
+	config_foreach disable_wifi_iface wifi-iface
+	uci_commit
+	wifi
+	rm /tmp/gluon-setup-mode-wifi-active
+}
+
+enable_wifi() {
+	config_foreach enable_wifi_iface wifi-iface
+	uci_commit
+	wifi
+	wait_disable_wifi &
+	PID=$!
+	echo $PID > /tmp/gluon-setup-mode-wifi-active
+}
+
+# Get PID in case WiFi is already active
 if [ -r /tmp/gluon-setup-mode-wifi-active ]; then
-	exit 0
+	PID=$(cat /tmp/gluon-setup-mode-wifi-active)
 fi
 
-
-if [ "$BUTTON" = wps -o "$BUTTON" = reset -o "$BUTTON" = rfkill ]; then
-	case "$ACTION" in
-		pressed)
-			touch /tmp/gluon-setup-mode-wifi-active
-			config_foreach enable_wifi wifi-iface
-			uci_commit
-			wifi
-			sleep 600
-			config_foreach disable_wifi wifi-iface
-			uci_commit
-			wifi
-			rm /tmp/gluon-setup-mode-wifi-active
-			;;
-	esac
-fi
+case "$ACTION" in
+	pressed)
+		if [[ -z "$PID" ]]; then
+			enable_wifi
+		else
+			kill $(cat /tmp/gluon-setup-mode-wifi-active)
+			disable_wifi
+		fi
+		;;
+esac
