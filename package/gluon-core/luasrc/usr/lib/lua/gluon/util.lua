@@ -174,17 +174,18 @@ end
 -- 1: mesh0
 -- 2: ibss0
 -- 3: wan_radio0 (private WLAN); batman-adv primary address
--- 4: client1; LAN
--- 5: mesh1
--- 6: ibss1
--- 7: wan_radio1 (private WLAN); mesh VPN
+-- 4: owe0; LAN
+-- 5: client1
+-- 6: mesh1
+-- 7: ibss1; mesh VPN
+-- 8: wan_radio1 (private WLAN)
+-- 9: owe1
 function M.generate_mac(i)
-	if i > 7 or i < 0 then return nil end -- max allowed id (0b111)
-
 	local hashed = string.sub(hash.md5(sysconfig.primary_mac), 0, 12)
 	local m1, m2, m3, m4, m5, m6 = string.match(hashed, '(%x%x)(%x%x)(%x%x)(%x%x)(%x%x)(%x%x)')
 
 	m1 = tonumber(m1, 16)
+	m5 = tonumber(m5, 16)
 	m6 = tonumber(m6, 16)
 
 	m1 = bit.bor(m1, 0x02)  -- set locally administered bit
@@ -197,7 +198,10 @@ function M.generate_mac(i)
 	m6 = bit.band(m6, 0xF8) -- zero the last three bits (space needed for counting)
 	m6 = m6 + i                   -- add virtual interface id
 
-	return string.format('%02x:%s:%s:%s:%s:%02x', m1, m2, m3, m4, m5, m6)
+	local overflow = math.floor(i/4)
+	m5 = math.fmod(m5 + overflow, 256)
+
+	return string.format('%02x:%s:%s:%s:%02x:%02x', m1, m2, m3, m4, m5, m6)
 end
 
 local function get_wlan_mac_from_driver(radio, vif)
@@ -228,7 +232,7 @@ function M.get_wlan_mac(_, radio, index, vif)
 		return addr
 	end
 
-	return M.generate_mac(4*(index-1) + (vif-1))
+	return M.generate_mac(5*(index-1) + (vif-1))
 end
 
 -- Iterate over all radios defined in UCI calling
