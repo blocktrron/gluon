@@ -7,6 +7,10 @@ fi
 
 ## Netgear
 
+if [ "$BROKEN" ] || [ "$GLUON_WLAN_MESH" = '11s' ]; then
+device netgear-ex6150 netgear_ex6150 # BROKEN: IBSS untested
+fi
+
 if [ "$BROKEN" ]; then
 device netgear-wndr3700v5 wndr3700v5 # BROKEN: Untested
 factory

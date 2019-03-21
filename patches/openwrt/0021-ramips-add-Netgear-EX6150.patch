@@ -1,0 +1,345 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 20 Mar 2019 16:47:29 +0100
+Subject: ramips: add Netgear EX6150
+
+SoC:   MediaTek MT7621
+RAM:   64M (Winbond W9751G6KB-25)
+FLASH: 16MB (Macronix MX25L12835F)
+WiFi:  MediaTek MT7662E bgn 2SS
+WiFi:  MediaTek MT7662E nac 2SS
+BTN:   ON/OFF - Reset - WPS - AP/Extender toggle
+LED:    - Arrow Right (blue)
+        - Arrow Left (blue)
+        - WiFi 1 (red/green)
+        - WiFi 2 (red/green)
+        - Power (green/amber)
+        - WPS (Green)
+UART:  UART is present as Pads on the backside of the PCB. They are
+       located on the other side of the Ethernet port.
+       3.3V - GND - TX - RX / 57600-8N1
+       3.3V is the nearest one to the antenna connectors
+
+Installation
+------------
+Update the factory image via the Netgear web-interfaces (by default:
+192.168.1.250/24).
+
+You can also use the factory image with the nmrpflash tool.
+For more information see https://github.com/jclehner/nmrpflash
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/ramips/base-files/etc/board.d/01_leds b/target/linux/ramips/base-files/etc/board.d/01_leds
+index 4203773b4fa3ec771f07b7a8c414a416a0da0f20..18695b25134b840c7b7e1171e2a130ba2d941857 100755
+--- a/target/linux/ramips/base-files/etc/board.d/01_leds
++++ b/target/linux/ramips/base-files/etc/board.d/01_leds
+@@ -301,6 +301,10 @@ mzk-ex750np)
+ na930)
+ 	set_usb_led "$boardname:blue:status"
+ 	;;
++netgear,ex6150)
++	ucidef_set_led_wlan "wlan2g" "WiFi 2.4GHz" "$boardname:green:router" "phy1tpt"
++	ucidef_set_led_wlan "wlan5g" "WiFi 5GHz" "$boardname:green:client" "phy0tpt"
++	;;
+ netgear,r6120)
+ 	ucidef_set_led_switch "lan" "lan" "$boardname:green:lan" "switch0" "0x0f"
+ 	ucidef_set_led_switch "wan" "wan" "$boardname:green:wan" "switch0" "0x10"
+diff --git a/target/linux/ramips/base-files/etc/board.d/02_network b/target/linux/ramips/base-files/etc/board.d/02_network
+index 9424c7ddfd64f9149a24ff91e63b71990265d211..ee15032bf58bda556878de538a105eecba4e7995 100755
+--- a/target/linux/ramips/base-files/etc/board.d/02_network
++++ b/target/linux/ramips/base-files/etc/board.d/02_network
+@@ -319,6 +319,7 @@ ramips_setup_interfaces()
+ 		ucidef_add_switch "switch0" \
+ 			"0:lan:4" "1:lan:3" "2:lan:2" "3:lan:1" "5:wan" "6@eth0"
+ 		;;
++	netgear,ex6150|\
+ 	re350-v1)
+ 		ucidef_add_switch "switch0" \
+ 			"0:lan" "6@eth0"
+diff --git a/target/linux/ramips/base-files/etc/diag.sh b/target/linux/ramips/base-files/etc/diag.sh
+index 097cc6df569518f64dbfd641eeccc1a4b1b37a2b..61c07a7263fc5345f8fcfd7db042df725e0785c0 100644
+--- a/target/linux/ramips/base-files/etc/diag.sh
++++ b/target/linux/ramips/base-files/etc/diag.sh
+@@ -38,6 +38,7 @@ get_status_led() {
+ 	mzk-w300nh2|\
+ 	nbg-419n|\
+ 	nbg-419n2|\
++	netgear,ex6150|\
+ 	netgear,r6120|\
+ 	pwh2004|\
+ 	r6220|\
+diff --git a/target/linux/ramips/dts/EX6150.dts b/target/linux/ramips/dts/EX6150.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c787a1542e9e25e625e68fe5ea6488c5a71d6905
+--- /dev/null
++++ b/target/linux/ramips/dts/EX6150.dts
+@@ -0,0 +1,247 @@
++/dts-v1/;
++
++#include "mt7621.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	compatible = "netgear,ex6150", "mediatek,mt7621-soc";
++	model = "Netgear EX6150";
++
++	aliases {
++		led-boot = &power_green;
++		led-failsafe = &power_amber;
++		led-running = &power_green;
++		led-upgrade = &power_amber;
++	};
++
++	memory@0 {
++		device_type = "memory";
++		reg = <0x0 0x4000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,57600";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		power_amber: power_amber {
++			label = "ex6150:amber:power";
++			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
++		};
++
++		power_green: power_green {
++			label = "ex6150:green:power";
++			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "ex6150:green:wps";
++			gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
++		};
++
++		rightarrow {
++			label = "ex6150:blue:rightarrow";
++			gpios = <&gpio0 28 GPIO_ACTIVE_LOW>;
++		};
++
++		leftarrow {
++			label = "ex6150:blue:leftarrow";
++			gpios = <&gpio0 31 GPIO_ACTIVE_LOW>;
++		};
++
++		router_green {
++			label = "ex6150:green:router";
++			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
++		};
++
++		router_red {
++			label = "ex6150:red:router";
++			gpios = <&gpio0 30 GPIO_ACTIVE_LOW>;
++		};
++
++		client_green {
++			label = "ex6150:green:client";
++			gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
++		};
++
++		client_red {
++			label = "ex6150:red:client";
++			gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	keys {
++		compatible = "gpio-keys-polled";
++		poll-interval = <20>;
++
++		wps {
++			label = "wps";
++			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_WPS_BUTTON>;
++		};
++
++		reset {
++			label = "reset";
++			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RESTART>;
++		};
++
++		toggle {
++			label = "AP/Extender toggle";
++			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
++			linux,code = <BTN_0>;
++			/* Active when switch is set to "Access Point" */
++		};
++	};
++};
++
++&spi0 {
++	status = "okay";
++
++	m25p80@0 {
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <10000000>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition@0 {
++				label = "u-boot";
++				reg = <0x0 0x30000>;
++				read-only;
++			};
++
++			partition@30000 {
++				label = "config";
++				reg = <0x30000 0x10000>;
++				read-only;
++			};
++
++			factory: partition@40000 {
++				label = "factory";
++				reg = <0x40000 0x10000>;
++				read-only;
++			};
++
++			partition@50000 {
++				compatible = "denx,uimage";
++				label = "firmware";
++				reg = <0x50000 0xe80000>;
++			};
++
++			partition@ed0000 {
++				label = "ML1";
++				reg = <0xed0000 0x10000>;
++				read-only;
++			};
++
++			partition@ef0000 {
++				label = "ML2";
++				reg = <0xef0000 0x20000>;
++				read-only;
++			};
++
++			partition@f10000 {
++				label = "ML3";
++				reg = <0xf10000 0x20000>;
++				read-only;
++			};
++
++			partition@f30000 {
++				label = "ML4";
++				reg = <0xf30000 0x20000>;
++				read-only;
++			};
++
++			partition@f50000 {
++				label = "ML5";
++				reg = <0xf50000 0x20000>;
++				read-only;
++			};
++
++			partition@f70000 {
++				label = "ML6";
++				reg = <0xf70000 0x20000>;
++				read-only;
++			};
++
++			partition@f90000 {
++				label = "ML7";
++				reg = <0xf90000 0x20000>;
++				read-only;
++			};
++
++			partition@fb0000 {
++				label = "T_Meter1";
++				reg = <0xfb0000 0x10000>;
++				read-only;
++			};
++
++			partition@fc0000 {
++				label = "T_Meter2";
++				reg = <0xfc0000 0x10000>;
++				read-only;
++			};
++
++			partition@fd0000 {
++				label = "POT";
++				reg = <0xfd0000 0x10000>;
++				read-only;
++			};
++
++			partition@fe0000 {
++				label = "board_data";
++				reg = <0xfe0000 0x10000>;
++				read-only;
++			};
++
++			partition@ff0000 {
++				label = "nvram";
++				reg = <0xff0000 0x10000>;
++				read-only;
++			};
++		};
++	};
++};
++
++&pcie {
++	status = "okay";
++
++	pcie0 {
++		wifi@0,0 {
++			reg = <0x0000 0 0 0 0>;
++			device_type = "pci";
++			mediatek,mtd-eeprom = <&factory 0x8000>;
++			ieee80211-freq-limit = <5000000 6000000>;
++		};
++	};
++
++	pcie1 {
++		wifi@0,0 {
++			reg = <0x0000 0 0 0 0>;
++			device_type = "pci";
++			mediatek,mtd-eeprom = <&factory 0x0000>;
++			ieee80211-freq-limit = <2400000 2500000>;
++		};
++	};
++};
++
++&ethernet {
++	mtd-mac-address = <&factory 0x00000004>;
++};
++
++&pinctrl {
++	state_default: pinctrl0 {
++		gpio {
++			ralink,group = "sdhci", "rgmii2", "jtag";
++			ralink,function = "gpio";
++		};
++	};
++};
+diff --git a/target/linux/ramips/image/mt7621.mk b/target/linux/ramips/image/mt7621.mk
+index c8de8bd5ff7d1bec4de5c4ffd84a589892871ecb..bee5d7c15c9ee4eb7f9c0079dea51f2605bdb528 100644
+--- a/target/linux/ramips/image/mt7621.mk
++++ b/target/linux/ramips/image/mt7621.mk
+@@ -234,6 +234,17 @@ define Device/rb750gr3
+ endef
+ TARGET_DEVICES += rb750gr3
+ 
++define Device/netgear_ex6150
++  DTS := EX6150
++  DEVICE_TITLE := Netgear EX6150
++  DEVICE_PACKAGES := kmod-mt76x2 wpad-basic
++  NETGEAR_BOARD_ID := U12H318T00_NETGEAR
++  IMAGE_SIZE := 14848k
++  IMAGES += factory.chk
++  IMAGE/factory.chk := $$(sysupgrade_bin) | check-size $$$$(IMAGE_SIZE) | netgear-chk
++endef
++TARGET_DEVICES += netgear_ex6150
++
+ define Device/mikrotik_rbm33g
+   DTS := RBM33G
+   BLOCKSIZE := 64k
