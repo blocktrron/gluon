@@ -9,6 +9,7 @@ fi
 
 if [ "$BROKEN" ] || [ "$GLUON_WLAN_MESH" = '11s' ]; then
 device netgear-ex6150 netgear_ex6150 # BROKEN: IBSS untested
+factory '.chk'
 fi
 
 if [ "$BROKEN" ]; then
