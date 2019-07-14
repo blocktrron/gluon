@@ -16,6 +16,7 @@ device('d-link-dir-860l-b1', 'dir-860l-b1', {
 
 device('netgear-r6220', 'r6220', {
 	factory = false,
+	sysupgrade_ext = '.tar',
 })
 
 device('netgear-wndr3700v5', 'wndr3700v5', {
