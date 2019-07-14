@@ -14,7 +14,7 @@ device('d-link-dir-860l-b1', 'dir-860l-b1', {
 
 -- Netgear
 
-device('netgear-r6220', 'netgear_r6220', {
+device('netgear-r6220', 'r6220', {
 	factory = false,
 })
 
