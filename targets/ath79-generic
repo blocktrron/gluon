@@ -1,0 +1,69 @@
+local ATH10K_PACKAGES_QCA9880 = {}
+local ATH10K_PACKAGES_QCA9888 = {}
+if env.GLUON_WLAN_MESH == '11s' then
+	ATH10K_PACKAGES_QCA9880 = {
+		'kmod-ath10k',
+		'-kmod-ath10k-ct',
+		'ath10k-firmware-qca988x',
+		'-ath10k-firmware-qca988x-ct',
+	}
+	ATH10K_PACKAGES_QCA9888 = {
+		'kmod-ath10k',
+		'-kmod-ath10k-ct',
+		'ath10k-firmware-qca9888',
+		'-ath10k-firmware-qca9888-ct',
+	}
+end
+
+
+-- devolo
+
+device('devolo-wifi-pro-1200e', 'devolo_dvl1200e', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+device('devolo-wifi-pro-1200i', 'devolo_dvl1200i', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+device('devolo-wifi-pro-1750c', 'devolo_dvl1750c', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+device('devolo-wifi-pro-1750e', 'devolo_dvl1750e', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+device('devolo-wifi-pro-1750i', 'devolo_dvl1750i', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+device('devolo-wifi-pro-1750x', 'devolo_dvl1750x', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+
+-- OCEDO
+
+device('ocedo-raccoon', 'ocedo_raccoon', {
+	factory = false,
+})
+
+device('ocedo-ursus', 'ocedo_ursus', {
+	factory = false,
+	packages = ATH10K_PACKAGES_QCA9880,
+})
+
+
+-- Xiaomi
+
+device('xiaomi-mi-router-4q', 'xiaomi_mi-router-4q', {
+	factory = false,
+})
+
