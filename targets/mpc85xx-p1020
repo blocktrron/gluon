@@ -1,0 +1,3 @@
+device('ocedo-panda', 'panda', {
+        factory = false,
+})
