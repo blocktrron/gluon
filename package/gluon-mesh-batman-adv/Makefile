@@ -46,6 +46,8 @@ endef
 define Package/gluon-mesh-batman-adv-15/install
 	$(Gluon/Build/Install)
 
+	$(CP) ./files-batman-adv-15/. $(1)/
+
 	$(INSTALL_DIR) $(1)/lib/gluon/mesh-batman-adv
 	echo 15 > $(1)/lib/gluon/mesh-batman-adv/compat
 endef
