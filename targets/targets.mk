@@ -11,6 +11,7 @@ $(eval $(call GluonTarget,ath79,tiny))
 endif
 $(eval $(call GluonTarget,brcm2708,bcm2708))
 $(eval $(call GluonTarget,brcm2708,bcm2709))
+$(eval $(call GluonTarget,lantiq,xrx200))
 $(eval $(call GluonTarget,lantiq,xway))
 $(eval $(call GluonTarget,mpc85xx,generic))
 $(eval $(call GluonTarget,mpc85xx,p1020))
