@@ -124,7 +124,7 @@ end
 -- Safe glob: returns an empty table when the glob fails because of
 -- a non-existing path
 function M.glob(pattern)
-	return posix_glob.glob(pattern) or {}
+	return posix_glob.glob(pattern, 0) or {}
 end
 
 local function find_phy_by_path(path)
