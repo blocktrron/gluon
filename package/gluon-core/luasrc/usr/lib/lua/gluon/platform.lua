@@ -52,4 +52,8 @@ function M.is_outdoor_device()
 	return false
 end
 
+function M.get_featureset()
+	return util.trim(M.readfile("/lib/gluon/featureset"))
+end
+
 return M
