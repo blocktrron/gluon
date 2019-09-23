@@ -106,8 +106,8 @@ list-targets: FORCE
 
 
 GLUON_DEFAULT_PACKAGES :=
-GLUON_FEATURESET_DEFAULT_PACKAGES := hostapd-openssl
-GLUON_FEATURESET_TINY_PACKAGES := hostapd-mini
+GLUON_FEATURESET_DEFAULT_PACKAGES := hostapd-openssl gluon-featureset-default
+GLUON_FEATURESET_TINY_PACKAGES := hostapd-mini gluon-featureset-tiny
 
 GLUON_FEATURE_PACKAGES := $(shell scripts/features.sh '$(GLUON_FEATURES)' || echo '__ERROR__')
 ifneq ($(filter __ERROR__,$(GLUON_FEATURE_PACKAGES)),)
