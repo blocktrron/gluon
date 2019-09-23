@@ -7,6 +7,8 @@ return function(funcs)
 
 	local target = arg[1]
 	local extra_packages = arg[2]
+	local featureset_default_packages = arg[3] or ""
+	local featureset_tiny_packages = arg[4] or ""
 
 	local openwrt_config_target
 	if env.SUBTARGET ~= '' then
@@ -58,18 +60,31 @@ END_MAKE
 		local profile = dev.options.profile or dev.name
 		local device_pkgs = default_pkgs
 
+		local featureset_pkgs = {}
+
 		local function handle_pkg(pkg)
 			if string.sub(pkg, 1, 1) ~= '-' then
 				funcs.config_package(lib.config, pkg, 'm')
 			end
 			device_pkgs = device_pkgs .. ' ' .. pkg
 		end
+		local function handle_pkgs(pkgs)
+			for pkg in pkgs do
+				handle_pkg(pkg)
+			end
+		end
 
 		for _, pkg in ipairs(dev.options.packages or {}) do
 			handle_pkg(pkg)
 		end
-		for pkg in string.gmatch(site_packages(dev.image), '%S+') do
-			handle_pkg(pkg)
+		handle_pkgs(string.gmatch(site_packages(dev.image), '%S+'))
+
+		if dev.options.featureset == "default" then
+			handle_pkgs(string.gmatch(featureset_default_packages, '%S+'))
+		end
+
+		if dev.options.featureset == "tiny" then
+			handle_pkgs(string.gmatch(featureset_tiny_packages, '%S+'))
 		end
 
 		funcs.config_message(lib.config, string.format("unable to enable device '%s'", profile),

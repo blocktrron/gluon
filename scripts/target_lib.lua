@@ -29,6 +29,7 @@ assert(env.GLUON_DEPRECATED)
 M.site_code = assert(assert(dofile('scripts/site_config.lua')('site.conf')).site_code)
 M.target_packages = {}
 M.configs = {}
+M.featureset = "default"
 M.devices = {}
 M.images = {}
 M.opkg = true
@@ -44,6 +45,7 @@ local default_options = {
 	aliases = {},
 	manifest_aliases = {},
 	packages = {},
+	featureset = false,
 	deprecated = false,
 	broken = false,
 }
@@ -167,6 +169,10 @@ function F.device(image, name, options)
 		return
 	end
 
+	if not options.featureset then
+		options.featureset = M.featureset
+	end
+
 	table.insert(M.devices, {
 		image = image,
 		name = name,
@@ -264,6 +270,10 @@ end
 
 function F.defaults(options)
 	default_options = merge(default_options, options)
+end
+
+function F.featureset(featureset)
+	M.featureset = featureset
 end
 
 function F.include(name)
