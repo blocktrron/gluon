@@ -105,9 +105,9 @@ list-targets: FORCE
 	@$(foreach target,$(GLUON_TARGETS),echo '$(target)';)
 
 
-GLUON_DEFAULT_PACKAGES := hostapd-mini
-GLUON_FEATURESET_DEFAULT_PACKAGES :=
-GLUON_FEATURESET_TINY_PACKAGES :=
+GLUON_DEFAULT_PACKAGES :=
+GLUON_FEATURESET_DEFAULT_PACKAGES := hostapd-openssl
+GLUON_FEATURESET_TINY_PACKAGES := hostapd-mini
 
 GLUON_FEATURE_PACKAGES := $(shell scripts/features.sh '$(GLUON_FEATURES)' || echo '__ERROR__')
 ifneq ($(filter __ERROR__,$(GLUON_FEATURE_PACKAGES)),)
