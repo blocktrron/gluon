@@ -95,6 +95,7 @@ files["targets/*"] = {
 		"exec_capture_raw",
 		"exec_raw",
 		"factory_image",
+		"featureset",
 		"include",
 		"no_opkg",
 		"packages",
