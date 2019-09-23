@@ -112,8 +112,8 @@ lint-sh: FORCE
 	@scripts/lint-sh.sh
 
 GLUON_DEFAULT_PACKAGES := hostapd-mini
-GLUON_FEATURESET_STANDARD_PACKAGES :=
-GLUON_FEATURESET_TINY_PACKAGES :=
+GLUON_FEATURESET_STANDARD_PACKAGES := gluon-featureset-standard
+GLUON_FEATURESET_TINY_PACKAGES := gluon-featureset-tiny
 
 GLUON_FEATURE_PACKAGES := $(shell scripts/features.sh '$(GLUON_FEATURES)' || echo '__ERROR__')
 ifneq ($(filter __ERROR__,$(GLUON_FEATURE_PACKAGES)),)
