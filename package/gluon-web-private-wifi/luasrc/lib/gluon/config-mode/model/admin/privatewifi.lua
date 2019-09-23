@@ -1,5 +1,6 @@
 local uci = require("simple-uci").cursor()
 local util = require 'gluon.util'
+local platform = require 'gluon.platform'
 
 -- where to read the configuration from
 local primary_iface = 'wan_radio0'
@@ -26,10 +27,29 @@ key:depends(enabled, true)
 key.datatype = "wpakey"
 key.default = uci:get('wireless', primary_iface, "key")
 
+local encryption = s:option(ListValue, "encryption", translate("Encryption"))
+encryption:depends(enabled, true)
+encryption:value("psk2", translate("WPA2"))
+if platform.supports_wpa3(uci) then
+	encryption:value("psk3-mixed", translate("WPA2 / WPA3"))
+	encryption:value("psk3", translate("WPA3"))
+end
+encryption.default = uci:get('wireless', primary_iface, 'encryption') or "psk2"
+
 function f:write()
 	util.foreach_radio(uci, function(radio, index)
 		local radio_name = radio['.name']
 		local name   = "wan_" .. radio_name
+
+		local pmf = 0
+
+		if platform.supports_wpa3(uci) then
+			if encryption.data == "psk3" then
+				pmf = 2
+			elseif encryption.data == "psk3-mixed" then
+				pmf = 1
+			end
+		end
 
 		if enabled.data then
 			local macaddr = util.get_wlan_mac(uci, radio, index, 4)
@@ -38,7 +58,8 @@ function f:write()
 				device     = radio_name,
 				network    = "wan",
 				mode       = 'ap',
-				encryption = 'psk2',
+				encryption = encryption.data,
+				ieee80211w = pmf,
 				ssid       = ssid.data,
 				key        = key.data,
 				macaddr    = macaddr,
