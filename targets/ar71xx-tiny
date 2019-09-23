@@ -1,5 +1,6 @@
 config 'CONFIG_GLUON_SPECIALIZE_KERNEL=y'
 
+featureset("tiny")
 no_opkg()
 
 packages {

@@ -66,6 +66,7 @@ device('zyxel-nbg6617', 'zyxel_nbg6617')
 
 device('zyxel-wre6606', 'zyxel_wre6606', {
 	factory = false,
+	featureset = "tiny", -- 128M ath10k + ath10k
 })
 
 

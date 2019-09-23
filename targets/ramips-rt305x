@@ -1,6 +1,7 @@
 config '# CONFIG_KERNEL_KALLSYMS is not set'
 config 'CONFIG_GLUON_SPECIALIZE_KERNEL=y'
 
+featureset("tiny")
 no_opkg()
 
 local STRIP_USB_PACKAGES = {

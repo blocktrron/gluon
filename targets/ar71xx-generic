@@ -22,6 +22,7 @@ device('8devices-carambola2-board', 'carambola2', {
 
 device('alfa-network-ap121f', 'ap121f', {
 	factory = false,
+	featureset = "tiny", -- 32M ath9k
 })
 
 
@@ -116,6 +117,7 @@ device('gl.inet-gl-ar750', 'gl-ar750', {
 
 device('linksys-wrt160nl', 'wrt160nl', {
 	profile = 'WRT160NL',
+	featureset = "tiny", -- 32M ath9k
 })
 
 
@@ -298,11 +300,13 @@ device('tp-link-archer-c7-v5', 'archer-c7-v5', {
 device('tp-link-archer-c25-v1', 'archer-c25-v1', {
 	packages = ATH10K_PACKAGES_QCA9887,
 	broken = true, -- OOM with 5GHz enabled in most environments
+	featureset = "tiny", -- 64M ath9k + ath10k
 })
 
 device('tp-link-archer-c58-v1', 'archer-c58-v1', {
 	packages = ATH10K_PACKAGES_QCA9886,
 	broken = true, -- OOM with 5GHz enabled in most environments
+	featureset = "tiny", -- 64M ath9k + ath10k
 })
 
 device('tp-link-archer-c59-v1', 'archer-c59-v1', {
@@ -313,25 +317,30 @@ device('tp-link-archer-c59-v1', 'archer-c59-v1', {
 device('tp-link-archer-c60-v1', 'archer-c60-v1', {
 	packages = ATH10K_PACKAGES_QCA9886,
 	broken = true, -- OOM with 5GHz enabled in most environments
+	featureset = "tiny", -- 64M ath9k + ath10k
 })
 
 device('tp-link-archer-c60-v2', 'archer-c60-v2', {
 	packages = ATH10K_PACKAGES_QCA9886,
 	broken = true, -- OOM with 5GHz enabled in most environments
+	featureset = "tiny", -- 64M ath9k + ath10k
 })
 
 device('tp-link-re355', 're355-v1', {
 	packages = ATH10K_PACKAGES,
 	broken = true, -- OOM with 5GHz enabled in most environments if device is 64M RAM variant
+	featureset = "tiny", -- Only 6M of useable Firmware space
 })
 
 device('tp-link-tl-wr902ac-v1', 'tl-wr902ac-v1', {
 	packages = ATH10K_PACKAGES_QCA9887,
 	broken = true, -- OOM due to insufficient RAM for ath10k expected
+	featureset = "tiny", -- 64M ath9k + ath10k
 })
 
 device('tp-link-re450', 're450-v1', {
 	packages = ATH10K_PACKAGES,
+	featureset = "tiny", -- Only 6M of useable Firmware space
 })
 
 
@@ -339,11 +348,16 @@ device('tp-link-re450', 're450-v1', {
 
 device('ubiquiti-airgateway', 'ubnt-air-gateway', {
 	aliases = {'ubiquiti-airgateway-lr'},
+	featureset = "tiny",
 })
 
-device('ubiquiti-airgateway-pro', 'ubnt-air-gateway-pro')
+device('ubiquiti-airgateway-pro', 'ubnt-air-gateway-pro', {
+	featureset = "tiny", -- 32M ath9k
+})
 
-device('ubiquiti-airrouter', 'ubnt-airrouter')
+device('ubiquiti-airrouter', 'ubnt-airrouter', {
+	featureset = "tiny", -- 32M ath9k
+})
 
 device('ubiquiti-bullet-m', 'ubnt-bullet-m', {
 	aliases = {
@@ -354,6 +368,7 @@ device('ubiquiti-bullet-m', 'ubnt-bullet-m', {
 		'ubiquiti-picostation-m2',
 	},
 	packages = { 'zram-swap' },
+	featureset = "tiny",
 })
 
 device('ubiquiti-rocket-m', 'ubnt-rocket-m', {
@@ -369,6 +384,7 @@ device('ubiquiti-nanostation-m', 'ubnt-nano-m', {
 		'ubiquiti-nanostation-m5',
 	},
 	packages = { 'zram-swap' },
+	featureset = "tiny", -- 32M ath9k
 })
 
 device('ubiquiti-loco-m-xw', 'ubnt-loco-m-xw', {
@@ -413,6 +429,7 @@ device('ubiquiti-unifiap-outdoor+', 'ubnt-unifi-outdoor-plus')
 
 device('ubiquiti-ls-sr71', 'ubnt-ls-sr71', {
 	broken = true, -- untested
+	featureset = "tiny", -- 32M ath9k
 })
 
 device('ubiquiti-unifi-ac-lite', 'ubnt-unifiac-lite', {
