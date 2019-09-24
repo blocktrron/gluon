@@ -12,4 +12,9 @@ for _, config in ipairs({'wifi24', 'wifi5'}) do
 		need_string_match(in_domain({config, 'ap', 'ssid'}), '^' .. ('.?'):rep(32) .. '$')
 		need_boolean({config, 'ap', 'disabled'}, false)
 	end
+
+	if need_table({config, 'owe'}, nil, false) then
+		need_string_match(in_domain({config, 'ap', 'ssid'}), '^' .. ('.?'):rep(32) .. '$')
+		need_boolean({config, 'ap', 'disabled'}, false)
+	end
 end

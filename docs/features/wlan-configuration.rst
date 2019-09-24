@@ -2,8 +2,8 @@ WLAN configuration
 ==================
 
 Gluon allows to configure 2.4GHz and 5GHz radios independently. The configuration
-may include any or all of the three networks "client" (AP mode), "mesh" (802.11s
-mode) and "ibss" (adhoc mode), which can be used simultaneously (using "mesh" and
+may include any or all of the four networks "client" (AP mode), "owe" (Enhanced Open),
+"mesh" (802.11s mode) and "ibss" (adhoc mode), which can be used simultaneously (using "mesh" and
 "ibss" at same time should be avoided though as weaker hardware usually can't handle the additional
 load). See :doc:`../user/site` for details on the configuration.
 

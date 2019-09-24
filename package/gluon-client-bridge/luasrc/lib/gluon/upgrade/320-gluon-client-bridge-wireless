@@ -3,6 +3,7 @@
 local util = require 'gluon.util'
 
 local uci = require('simple-uci').cursor()
+local platform = require 'gluon.platform'
 
 
 local function is_disabled(config, name)
@@ -42,6 +43,30 @@ util.foreach_radio(uci, function(radio, index, config)
 		ifname = suffix and 'client' .. suffix,
 		disabled = disabled or false,
 	})
+
+	if platform.supports_wpa3(uci) then
+		local owe = config.owe
+		name = 'owe_' .. radio_name
+		disabled = is_disabled(owe, name)
+
+		uci:delete('wireless', name)
+
+		macaddr = util.get_wlan_mac(uci, radio, index, 3)
+		if not macaddr then
+			return
+		end
+
+		uci:section('wireless', 'wifi-iface', name, {
+			device = radio_name,
+			network = 'client',
+			mode = 'ap',
+			encryption = 'owe',
+			ssid = owe.ssid(),
+			macaddr = macaddr,
+			ifname = suffix and 'owe' .. suffix,
+			disabled = disabled or false,
+		})
+	end
 end)
 
 uci:save('wireless')
