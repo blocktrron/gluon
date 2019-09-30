@@ -1,0 +1,56 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 28 Sep 2019 18:45:45 +0200
+Subject: ath10k-ct: increment adter dequeue
+
+diff --git a/package/kernel/ath10k-ct/patches/800-increase-after-dequeue.patch b/package/kernel/ath10k-ct/patches/800-increase-after-dequeue.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a61a2e308a6d57a6aa66dfef35480d1758eb8e0
+--- /dev/null
++++ b/package/kernel/ath10k-ct/patches/800-increase-after-dequeue.patch
+@@ -0,0 +1,46 @@
++--- a/ath10k-4.19/mac.c
+++++ b/ath10k-4.19/mac.c
++@@ -4811,13 +4811,6 @@ int ath10k_mac_tx_push_txq(struct ieee80
++ 	bool is_mgmt, is_presp;
++ 	int ret;
++ 
++-	spin_lock_bh(&ar->htt.tx_lock);
++-	ret = ath10k_htt_tx_inc_pending(htt);
++-	spin_unlock_bh(&ar->htt.tx_lock);
++-
++-	if (ret)
++-		return ret;
++-
++ 	/* Add debugging for this crash Brent saw in station reset test */
++ 	/* FW crashed, then kernel */
++ 	/*
++@@ -4843,18 +4836,23 @@ int ath10k_mac_tx_push_txq(struct ieee80
++ 	if (WARN_ON(((unsigned long)(hw)) < 4000))
++ 		return -ENOENT;
++ 
+++	spin_lock_bh(&ar->htt.tx_lock);
+++	if (htt->num_pending_tx >= htt->max_num_pending_tx)
+++		return -EBUSY;
+++
++ 	skb = ieee80211_tx_dequeue(hw, txq);
++ 
++ 	if (WARN_ON((((unsigned long)(skb)) < 4000) && (((unsigned long)(skb)) > 0)))
++ 		return -ENOENT;
++ 
++-	if (!skb) {
++-		spin_lock_bh(&ar->htt.tx_lock);
++-		ath10k_htt_tx_dec_pending(htt);
++-		spin_unlock_bh(&ar->htt.tx_lock);
++-
+++	if (!skb)
++ 		return -ENOENT;
++-	}
+++
+++	ret = ath10k_htt_tx_inc_pending(htt);
+++	spin_unlock_bh(&ar->htt.tx_lock);
+++
+++	if (ret)
+++		return ret;
++ 
++ 	ath10k_mac_tx_h_fill_cb(ar, vif, txq, skb);
++ 

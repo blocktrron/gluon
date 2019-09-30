@@ -1,0 +1,84 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Mon, 30 Sep 2019 19:52:05 +0200
+Subject: ath10k: check skb before TX stop
+
+diff --git a/package/kernel/mac80211/patches/ath/985-check-skb-before-tx-stop.patch b/package/kernel/mac80211/patches/ath/985-check-skb-before-tx-stop.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..cf1372214903b99d2204bde9c9797077c9d86035
+--- /dev/null
++++ b/package/kernel/mac80211/patches/ath/985-check-skb-before-tx-stop.patch
+@@ -0,0 +1,74 @@
++--- a/drivers/net/wireless/ath/ath10k/htt_tx.c
+++++ b/drivers/net/wireless/ath/ath10k/htt_tx.c
++@@ -160,7 +160,7 @@ void ath10k_htt_tx_dec_pending(struct at
++ 		ath10k_mac_tx_unlock(htt->ar, ATH10K_TX_PAUSE_Q_FULL);
++ }
++ 
++-int ath10k_htt_tx_inc_pending(struct ath10k_htt *htt)
+++int ath10k_htt_tx_inc_pending(struct ath10k_htt *htt, bool should_pause)
++ {
++ 	lockdep_assert_held(&htt->tx_lock);
++ 
++@@ -168,7 +168,7 @@ int ath10k_htt_tx_inc_pending(struct ath
++ 		return -EBUSY;
++ 
++ 	htt->num_pending_tx++;
++-	if (htt->num_pending_tx == htt->max_num_pending_tx)
+++	if (htt->num_pending_tx == htt->max_num_pending_tx && should_pause)
++ 		ath10k_mac_tx_lock(htt->ar, ATH10K_TX_PAUSE_Q_FULL);
++ 
++ 	return 0;
++--- a/drivers/net/wireless/ath/ath10k/mac.c
+++++ b/drivers/net/wireless/ath/ath10k/mac.c
++@@ -3353,6 +3353,10 @@ void ath10k_mac_tx_unlock(struct ath10k
++ 	lockdep_assert_held(&ar->htt.tx_lock);
++ 
++ 	WARN_ON(reason >= ATH10K_TX_PAUSE_MAX);
+++
+++	if (!(ar->tx_paused & BIT(reason)))
+++		return;
+++
++ 	ar->tx_paused &= ~BIT(reason);
++ 
++ 	if (ar->tx_paused)
++@@ -4037,7 +4041,7 @@ int ath10k_mac_tx_push_txq(struct ieee80
++ 	int ret;
++ 
++ 	spin_lock_bh(&ar->htt.tx_lock);
++-	ret = ath10k_htt_tx_inc_pending(htt);
+++	ret = ath10k_htt_tx_inc_pending(htt, false);
++ 	spin_unlock_bh(&ar->htt.tx_lock);
++ 
++ 	if (ret)
++@@ -4052,6 +4056,11 @@ int ath10k_mac_tx_push_txq(struct ieee80
++ 		return -ENOENT;
++ 	}
++ 
+++	spin_lock_bh(&ar->htt.tx_lock);
+++	if (htt->num_pending_tx == htt->max_num_pending_tx)
+++		ath10k_mac_tx_lock(htt->ar, ATH10K_TX_PAUSE_Q_FULL);
+++	spin_unlock_bh(&ar->htt.tx_lock);
+++
++ 	ath10k_mac_tx_h_fill_cb(ar, vif, txq, skb);
++ 
++ 	skb_len = skb->len;
++@@ -4335,7 +4344,7 @@ static void ath10k_mac_op_tx(struct ieee
++ 		spin_lock_bh(&ar->htt.tx_lock);
++ 		is_presp = ieee80211_is_probe_resp(hdr->frame_control);
++ 
++-		ret = ath10k_htt_tx_inc_pending(htt);
+++		ret = ath10k_htt_tx_inc_pending(htt, true);
++ 		if (ret) {
++ 			ath10k_warn(ar, "failed to increase tx pending count: %d, dropping\n",
++ 				    ret);
++--- a/drivers/net/wireless/ath/ath10k/htt.h
+++++ b/drivers/net/wireless/ath/ath10k/htt.h
++@@ -2060,7 +2060,7 @@ void ath10k_htt_tx_txq_recalc(struct iee
++ 			      struct ieee80211_txq *txq);
++ void ath10k_htt_tx_txq_sync(struct ath10k *ar);
++ void ath10k_htt_tx_dec_pending(struct ath10k_htt *htt);
++-int ath10k_htt_tx_inc_pending(struct ath10k_htt *htt);
+++int ath10k_htt_tx_inc_pending(struct ath10k_htt *htt, bool should_pause);
++ void ath10k_htt_tx_mgmt_dec_pending(struct ath10k_htt *htt);
++ int ath10k_htt_tx_mgmt_inc_pending(struct ath10k_htt *htt, bool is_mgmt,
++ 				   bool is_presp);
