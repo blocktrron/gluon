@@ -1,0 +1,30 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 3 Oct 2019 00:21:55 +0200
+Subject: ath10k-firmware: bump QCA988x firmware
+
+diff --git a/package/firmware/ath10k-firmware/Makefile b/package/firmware/ath10k-firmware/Makefile
+index e5e541635dfa86e8b37a3325f38f1ecbcbf9af9f..14f400038a8a73bd7c2b43f0d87cb5e8ec493445 100644
+--- a/package/firmware/ath10k-firmware/Makefile
++++ b/package/firmware/ath10k-firmware/Makefile
+@@ -8,9 +8,9 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=ath10k-firmware
+-PKG_SOURCE_DATE:=2019-06-28
+-PKG_SOURCE_VERSION:=7651f5bb299c40e34e05179b1bd15b211856a4b0
+-PKG_MIRROR_HASH:=9c87fc79bc9f209069ca77f2eb15f6d6ca0299fb789c2ce2032c69d9d561a5c9
++PKG_SOURCE_DATE:=2019-09-13
++PKG_SOURCE_VERSION:=afa45b6f27857ef362eb01206929cb0662bf5a53
++PKG_MIRROR_HASH:=cea70c50df8c4054238cde84362d8b766eb15d365cbfd19b5b53c7ac35e4fc44
+ PKG_RELEASE:=1
+ 
+ PKG_SOURCE_PROTO:=git
+@@ -433,7 +433,7 @@ define Package/ath10k-firmware-qca988x/install
+ 		$(PKG_BUILD_DIR)/QCA988X/hw2.0/board.bin \
+ 		$(1)/lib/firmware/ath10k/QCA988X/hw2.0/
+ 	$(INSTALL_DATA) \
+-		$(PKG_BUILD_DIR)/QCA988X/hw2.0/10.2.4-1.0/firmware-5.bin_10.2.4-1.0-00037 \
++		$(PKG_BUILD_DIR)/QCA988X/hw2.0/10.2.4-1.0/firmware-5.bin_10.2.4-1.0-00047 \
+ 		$(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
+ endef
+ 
