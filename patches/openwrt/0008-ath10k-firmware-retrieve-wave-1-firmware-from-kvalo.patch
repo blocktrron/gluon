@@ -1,0 +1,53 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 5 Oct 2019 02:12:56 +0200
+Subject: ath10k-firmware: retrieve wave 1 firmware from kvalo
+
+This commit changes the source of the Wave 1 ath10k-firmware
+from linux-firmware to Kall Valos ath10k-firmware repository.
+
+This is neaessary as the firmware selected in linux-firmware produces
+frequent crashes in some circumstances.
+
+This patch can be removed as soon as linux-firmware carries
+10.2.4-1.0-00047 firmware.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/firmware/ath10k-firmware/Makefile b/package/firmware/ath10k-firmware/Makefile
+index e5e541635dfa86e8b37a3325f38f1ecbcbf9af9f..15d9d0ce992a8161953ab3cc91058fc3ba36c096 100644
+--- a/package/firmware/ath10k-firmware/Makefile
++++ b/package/firmware/ath10k-firmware/Makefile
+@@ -606,9 +606,9 @@ define Package/ath10k-firmware-qca9888-ct-htt/install
+ 		$(1)/lib/firmware/ath10k/QCA9888/hw2.0/ct-firmware-5.bin
+ endef
+ 
+-#$(eval $(call BuildPackage,ath10k-firmware-qca9887))
++$(eval $(call BuildPackage,ath10k-firmware-qca9887))
+ #$(eval $(call BuildPackage,ath10k-firmware-qca9888))
+-#$(eval $(call BuildPackage,ath10k-firmware-qca988x))
++$(eval $(call BuildPackage,ath10k-firmware-qca988x))
+ #$(eval $(call BuildPackage,ath10k-firmware-qca99x0))
+ #$(eval $(call BuildPackage,ath10k-firmware-qca6174))
+ #$(eval $(call BuildPackage,ath10k-firmware-qca9984))
+diff --git a/package/firmware/linux-firmware/qca_ath10k.mk b/package/firmware/linux-firmware/qca_ath10k.mk
+index a7c5b13b84e69fd8a9f0f38e9889c4f9539af007..72735819fd16148f7fbd59309e4920475a719e23 100644
+--- a/package/firmware/linux-firmware/qca_ath10k.mk
++++ b/package/firmware/linux-firmware/qca_ath10k.mk
+@@ -31,7 +31,7 @@ define Package/ath10k-firmware-qca9887/install
+ 		$(PKG_BUILD_DIR)/ath10k/QCA9887/hw1.0/board.bin \
+ 		$(1)/lib/firmware/ath10k/QCA9887/hw1.0/board.bin
+ endef
+-$(eval $(call BuildPackage,ath10k-firmware-qca9887))
++# $(eval $(call BuildPackage,ath10k-firmware-qca9887))
+ 
+ Package/ath10k-firmware-qca9888 = $(call Package/firmware-default,ath10k qca9888 firmware)
+ define Package/ath10k-firmware-qca9888/install
+@@ -55,7 +55,7 @@ define Package/ath10k-firmware-qca988x/install
+ 		$(PKG_BUILD_DIR)/ath10k/QCA988X/hw2.0/firmware-5.bin \
+ 		$(1)/lib/firmware/ath10k/QCA988X/hw2.0/firmware-5.bin
+ endef
+-$(eval $(call BuildPackage,ath10k-firmware-qca988x))
++# $(eval $(call BuildPackage,ath10k-firmware-qca988x))
+ 
+ Package/ath10k-firmware-qca6174 = $(call Package/firmware-default,ath10k qca6174 firmware)
+ define Package/ath10k-firmware-qca6174/install
