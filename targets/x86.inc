@@ -1,7 +1,7 @@
 config 'CONFIG_VDI_IMAGES=y'
 config 'CONFIG_VMDK_IMAGES=y'
 
-local ATH10K_PACKAGES = {'kmod-ath10k-ct', 'ath10k-firmware-qca9887', 'ath10k-firmware-qca988x'}
+local ATH10K_PACKAGES = {'kmod-ath10k', 'ath10k-firmware-qca6174', 'ath10k-firmware-qca9887', 'ath10k-firmware-qca9888', 'ath10k-firmware-qca988x'}
 if env.GLUON_WLAN_MESH == 'ibss' then
 	ATH10K_PACKAGES = {'kmod-ath10k-ct', 'ath10k-firmware-qca9887-ct', 'ath10k-firmware-qca988x-ct'}
 end
