@@ -56,4 +56,29 @@ function M.get_featureset()
 	return util.trim(M.readfile("/lib/gluon/featureset"))
 end
 
+function M.supports_wpa3()
+	return util.file_contains_line('/lib/gluon/supported_wireless_encryption', 'wpa3')
+end
+
+function M.supports_mfp(uci)
+	local idx = 0
+	local supports_mfp = true
+
+	if not M.supports_wpa3() then
+		return false
+	end
+
+	uci:foreach('wireless', 'wifi-device', function()
+		local phypath = '/sys/kernel/debug/ieee80211/phy' .. idx .. '/'
+
+		if not util.file_contains_line(phypath .. 'hwflags', 'MFP_CAPABLE') then
+			supports_mfp = false
+		end
+
+		idx = idx + 1
+	end)
+
+	return supports_mfp
+end
+
 return M

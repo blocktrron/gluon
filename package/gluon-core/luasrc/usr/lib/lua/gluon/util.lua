@@ -35,6 +35,21 @@ function M.contains(table, value)
 	return false
 end
 
+function M.file_contains_line(path, value)
+	local file_content = M.readfile(path)
+
+	if file_content == nil then
+		return false
+	end
+
+	for line in file_content:gmatch("[^\n]+") do
+		if line == value then
+			return true
+		end
+	end
+	return false
+end
+
 function M.add_to_set(t, itm)
 	for _,v in ipairs(t) do
 		if v == itm then return false end
