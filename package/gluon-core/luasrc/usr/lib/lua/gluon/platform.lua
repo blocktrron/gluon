@@ -1,5 +1,6 @@
 local platform_info = require 'platform_info'
 local util = require 'gluon.util'
+local sys_stat = require 'posix.sys.stat'
 
 
 local M = setmetatable({}, {
@@ -51,6 +52,41 @@ end
 
 function M.get_featureset()
 	return M.readfile("/lib/gluon/featureset")
+end
+
+function M.supports_mfp(uci)
+	local idx = 0
+	local supports_mfp = true
+
+	uci:foreach('wireless', 'wifi-device', function(radio)
+		local phypath = '/sys/kernel/debug/ieee80211/phy' .. idx .. '/'
+		local hwflags = util.readfile(phypath .. 'hwflags')
+
+		if hwflags == nil then
+			supports_mfp = false
+			return
+		end
+
+		local radio_supports_mfp = false
+
+		for s in hwflags:gmatch("[^\n]+") do
+			if s == "MFP_CAPABLE" then
+				radio_supports_mfp = true
+			end
+		end
+
+		if radio_supports_mfp == false then
+			supports_mfp = false
+		end
+
+		idx = idx + 1
+	end)
+
+	return supports_mfp
+end
+
+function M.supports_wpa3(uci)
+	return M.get_featureset ~= "tiny" and M.supports_mfp(uci)
 end
 
 return M
