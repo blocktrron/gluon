@@ -71,6 +71,9 @@ uci:foreach('wireless', 'wifi-device', function(config)
 
 		function o:write(data)
 			uci:set('wireless', t .. '_' .. radio, 'disabled', not data)
+			if t == 'client' and uci:get('wireless', 'owe_' .. radio, 'disabled') ~= nil then
+				uci:set('wireless', 'owe_' .. radio, 'disabled', not data)
+			end
 		end
 	end
 
