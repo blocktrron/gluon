@@ -1,9 +1,28 @@
+local ATH10K_PACKAGES_QCA9880 = {
+	'kmod-ath10k',
+	'-kmod-ath10k-ct',
+	'ath10k-firmware-qca9888',
+	'-ath10k-firmware-qca9888-ct',
+}
+
 local ATH10K_PACKAGES_QCA9888 = {
 	'kmod-ath10k',
 	'-kmod-ath10k-ct',
 	'ath10k-firmware-qca9888',
 	'-ath10k-firmware-qca9888-ct',
 }
+
+-- devolo
+
+device('devolo-wifi-pro-1200i', 'devolo_dvl1200i', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('devolo-wifi-pro-1750i', 'devolo_dvl1750i', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
 
 -- TP-Link
 
