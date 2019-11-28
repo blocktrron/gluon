@@ -223,25 +223,25 @@ jobs:
           name: lantiq-xway_output
           path: output
 
-  mpc85xx-generic:
-    name: mpc85xx-generic
+  mpc85xx-p1010:
+    name: mpc85xx-p1010
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
-        run: contrib/actions/run-build.sh mpc85xx-generic
+        run: contrib/actions/run-build.sh mpc85xx-p1010
       - name: Archive build logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v1
         with:
-          name: mpc85xx-generic_logs
+          name: mpc85xx-p1010_logs
           path: openwrt/logs
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: mpc85xx-generic_output
+          name: mpc85xx-p1010_output
           path: output
 
   mpc85xx-p1020:
