@@ -10,9 +10,9 @@ ar71xx-generic
 
 * ALFA Network
 
-  - AP121 [#deprecated]_
+  - AP121 [#deprecated]_  [#featureset-tiny]_
   - AP121F
-  - AP121U [#deprecated]_
+  - AP121U [#deprecated]_  [#featureset-tiny]_
 
 * Allnet
 
@@ -47,7 +47,7 @@ ar71xx-generic
 
 * Linksys
 
-  - WRT160NL
+  - WRT160NL  [#featureset-tiny]_
 
 * Netgear
 
@@ -82,7 +82,7 @@ ar71xx-generic
   - CPE220 (v1.1)
   - CPE510 (v1.0, v1.1)
   - CPE520 (v1.1)
-  - RE450 (v1)
+  - RE450 (v1)  [#featureset-tiny]_
   - TL-WDR3500 (v1)
   - TL-WDR3600 (v1)
   - TL-WDR4300 (v1)
@@ -96,16 +96,16 @@ ar71xx-generic
 
 * Ubiquiti
 
-  - Air Gateway
-  - Air Gateway LR
-  - Air Gateway PRO
-  - Air Router
-  - Bullet M2/M5
-  - Loco M2/M5
+  - Air Gateway  [#featureset-tiny]_
+  - Air Gateway LR  [#featureset-tiny]_
+  - Air Gateway PRO  [#featureset-tiny]_
+  - Air Router  [#featureset-tiny]_
+  - Bullet M2/M5  [#featureset-tiny]_
+  - Loco M2/M5  [#featureset-tiny]_
   - Loco M2/M5 XW
-  - Nanostation M2/M5
+  - Nanostation M2/M5  [#featureset-tiny]_
   - Nanostation M2/M5 XW
-  - Picostation M2
+  - Picostation M2  [#featureset-tiny]_
   - Rocket M2/M5
   - Rocket M2/M5 Ti
   - Rocket M2/M5 XW
@@ -145,8 +145,8 @@ ar71xx-nand
 
   - NBG6716
 
-ar71xx-tiny [#deprecated]_
---------------------------
+ar71xx-tiny [#deprecated]_ [#featureset-tiny]_
+----------------------------------------------
 
 * D-Link
 
@@ -236,7 +236,7 @@ ipq40xx-generic
 * ZyXEL
 
   - NBG6617
-  - WRE6606
+  - WRE6606  [#featureset-tiny]_
 
 ipq806x-generic
 ---------------
@@ -359,8 +359,8 @@ ramips-mt76x8
 
   - VoCore2
 
-ramips-rt305x [#deprecated]_
-----------------------------
+ramips-rt305x [#deprecated]_  [#featureset-tiny]_
+-------------------------------------------------
 
 * A5-V11
 
@@ -410,6 +410,10 @@ Footnotes
 .. [#deprecated]
   The device or target is reaching its end of life soon. This means that support
   in the next major release of Gluon is doubtful.
+
+.. [#featureset-tiny]
+  These devices do not support the full featureset of Gluon. Namely, WPA3 support
+  for the private WLAN is missing on these devices.
 
 .. [#avmflash]
   For instructions on how to flash AVM devices, visit https://fritzfla.sh
