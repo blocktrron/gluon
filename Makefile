@@ -115,19 +115,26 @@ GLUON_DEFAULT_PACKAGES := hostapd-mini
 GLUON_FEATURESET_STANDARD_PACKAGES := gluon-featureset-standard
 GLUON_FEATURESET_TINY_PACKAGES := gluon-featureset-tiny
 
-GLUON_FEATURE_PACKAGES := $(shell scripts/features.sh '$(GLUON_FEATURES)' || echo '__ERROR__')
-ifneq ($(filter __ERROR__,$(GLUON_FEATURE_PACKAGES)),)
-$(error Error while evaluating GLUON_FEATURES)
+GLUON_FEATURESET_STANDARD_FEATURE_PACKAGES := 
+GLUON_FEATURESET_TINY_FEATURE_PACKAGES := 
+
+define feature_packages
+  $(1) := $(shell scripts/features.sh '$(2)' || echo '__ERROR__')
+endef
+$(eval $(call feature_packages, GLUON_FEATURESET_STANDARD_FEATURE_PACKAGES, $(GLUON_FEATURES) $(GLUON_FEATURESET_STANDARD_FEATURES)))
+$(eval $(call feature_packages, GLUON_FEATURESET_TINY_FEATURE_PACKAGES, $(GLUON_FEATURES) $(GLUON_FEATURESET_TINY_FEATURES)))
+ifneq ($(filter __ERROR__,$(GLUON_FEATURESET_STANDARD_FEATURE_PACKAGES) $(GLUON_FEATURESET_TINY_FEATURE_PACKAGES)),)
+  $(error Error while evaluating features)
 endif
 
-
-GLUON_PACKAGES :=
 define merge_packages
-  $(foreach pkg,$(1),
-    GLUON_PACKAGES := $$(strip $$(filter-out -$$(patsubst -%,%,$(pkg)) $$(patsubst -%,%,$(pkg)),$$(GLUON_PACKAGES)) $(pkg))
+  $(foreach pkg,$(2),
+    $(1) := $$(strip $$(filter-out -$$(patsubst -%,%,$(pkg)) $$(patsubst -%,%,$(pkg)),$$(value $(1))) $(pkg))
   )
 endef
-$(eval $(call merge_packages,$(GLUON_DEFAULT_PACKAGES) $(GLUON_FEATURE_PACKAGES) $(GLUON_SITE_PACKAGES)))
+$(eval $(call merge_packages, GLUON_DEFAULT_PACKAGES, $(GLUON_DEFAULT_PACKAGES) $(GLUON_SITE_PACKAGES)))
+$(eval $(call merge_packages, GLUON_FEATURESET_STANDARD_PACKAGES, $(GLUON_FEATURESET_STANDARD_PACKAGES) $(GLUON_FEATURESET_STANDARD_FEATURE_PACKAGES)))
+$(eval $(call merge_packages, GLUON_FEATURESET_TINY_PACKAGES, $(GLUON_FEATURESET_TINY_PACKAGES) $(GLUON_FEATURESET_TINY_FEATURE_PACKAGES)))
 
 
 LUA := openwrt/staging_dir/hostpkg/bin/lua
@@ -146,12 +153,12 @@ config: $(LUA) FORCE
 	$(foreach conf,site $(patsubst $(GLUON_SITEDIR)/%.conf,%,$(wildcard $(GLUON_SITEDIR)/domains/*.conf)),$(call CheckSite,$(conf)))
 
 	@$(GLUON_CONFIG_VARS) \
-		$(LUA) scripts/target_config.lua '$(GLUON_TARGET)' '$(GLUON_PACKAGES)' '$(GLUON_FEATURESET_STANDARD_PACKAGES)' '$(GLUON_FEATURESET_TINY_PACKAGES)' \
+		$(LUA) scripts/target_config.lua '$(GLUON_TARGET)' '$(GLUON_DEFAULT_PACKAGES)' '$(GLUON_FEATURESET_STANDARD_PACKAGES)' '$(GLUON_FEATURESET_TINY_PACKAGES)' \
 		> openwrt/.config
 	+@$(OPENWRTMAKE) defconfig
 
 	@$(GLUON_CONFIG_VARS) \
-		$(LUA) scripts/target_config_check.lua '$(GLUON_TARGET)' '$(GLUON_PACKAGES)' '$(GLUON_FEATURESET_STANDARD_PACKAGES)' '$(GLUON_FEATURESET_TINY_PACKAGES)'
+		$(LUA) scripts/target_config_check.lua '$(GLUON_TARGET)' '$(GLUON_DEFAULT_PACKAGES)' '$(GLUON_FEATURESET_STANDARD_PACKAGES)' '$(GLUON_FEATURESET_TINY_PACKAGES)'
 
 
 all: config
