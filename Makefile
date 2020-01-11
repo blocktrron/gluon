@@ -111,7 +111,7 @@ lint-lua: FORCE
 lint-sh: FORCE
 	@scripts/lint-sh.sh
 
-GLUON_DEFAULT_PACKAGES := hostapd-mini
+GLUON_DEFAULT_PACKAGES :=
 GLUON_FEATURESET_STANDARD_PACKAGES := gluon-featureset-standard
 GLUON_FEATURESET_TINY_PACKAGES := gluon-featureset-tiny
 
