@@ -1,39 +1,68 @@
 #!/usr/bin/lua
 
 local util = require 'gluon.util'
+local platform = require 'gluon.platform'
 
 local uci = require('simple-uci').cursor()
 
 
 util.foreach_radio(uci, function(radio, index, config)
 	local radio_name = radio['.name']
-
-	local name = 'client_' .. radio_name
 	local suffix = radio_name:match('^radio(%d+)$')
 
 	local ap = config.ap
-	local disabled = util.is_vap_disabled(ap, name)
+	local client_name = 'client_' .. radio_name
 
-	uci:delete('wireless', name)
+	local client_disabled = util.is_vap_disabled(ap, client_name)
+
+	uci:delete('wireless', client_name)
 
 	if not ap() then
 		return
 	end
 
-	local macaddr = util.get_wlan_mac(uci, radio, index, 1)
-	if not macaddr then
+	local client_macaddr = util.get_wlan_mac(uci, radio, index, 1)
+
+	if not client_macaddr then
 		return
 	end
 
-	uci:section('wireless', 'wifi-iface', name, {
+	uci:section('wireless', 'wifi-iface', client_name, {
 		device = radio_name,
 		network = 'client',
 		mode = 'ap',
 		ssid = ap.ssid(),
-		macaddr = macaddr,
+		macaddr = client_macaddr,
 		ifname = suffix and 'client' .. suffix,
-		disabled = disabled or false,
+		disabled = client_disabled or false,
 	})
+
+	local owe = config.owe
+	local owe_name = 'owe_' .. radio_name
+	local owe_macaddr = util.get_wlan_mac(uci, radio, index, 3)
+
+	uci:delete('wireless', owe_name)
+
+	if not owe() or not owe_macaddr or not platform.supports_mfp(uci) then
+		return
+	end
+
+	uci:section('wireless', 'wifi-iface', owe_name, {
+		device = radio_name,
+		network = 'client',
+		mode = 'ap',
+		ssid = ap.ssid(),
+		macaddr = owe_macaddr,
+		ifname = suffix and 'owe' .. suffix,
+		disabled = client_disabled or false,
+	})
+
+	if owe.transition_mode() then
+		uci:set('wireless', owe_name, 'owe_transition_ssid', ap.ssid())
+		uci:set('wireless', owe_name, 'owe_transition_bssid', client_macaddr)
+		uci:set('wireless', client_name, 'owe_transition_ssid', owe.ssid())
+		uci:set('wireless', client_name, 'owe_transition_bssid', owe_macaddr)
+	end
 end)
 
 uci:save('wireless')
