@@ -1,0 +1,56 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 13 Feb 2020 12:59:26 +0100
+Subject: mac80211 ath10k: add support for configuring management packet rate
+
+By default the firmware uses 1Mbps and 6Mbps rate for management packets
+in 2G and 5G bands respectively. But when the user selects different
+basic rates from the userspace, we need to send the management
+packets at the lowest basic rate selected by the user.
+
+This change makes use of WMI_VDEV_PARAM_MGMT_RATE param for configuring the
+management packets rate to the firmware.
+
+Chipsets Tested : QCA988X, QCA9887, QCA9984
+FW Tested 	: 10.2.4-1.0-41, 10.4-3.6.104
+
+Signed-off-by: Sriram R <srirrama@codeaurora.org>
+Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
+[backport to OpenWrt 19.07]
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/kernel/mac80211/patches/ath/982-ath10k-add-support-for-configuring-management-packet.patch b/package/kernel/mac80211/patches/ath/982-ath10k-add-support-for-configuring-management-packet.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f3004749d4851e473b94d27675e89579f6a6025
+--- /dev/null
++++ b/package/kernel/mac80211/patches/ath/982-ath10k-add-support-for-configuring-management-packet.patch
+@@ -0,0 +1,30 @@
++From f279294e9ee22a8f306fdc8e4181cf555e6f0f70 Mon Sep 17 00:00:00 2001
++From: Sriram R <srirrama@codeaurora.org>
++Date: Mon, 10 Sep 2018 11:09:40 +0530
++Subject: [PATCH] ath10k: add support for configuring management packet rate
++
++By default the firmware uses 1Mbps and 6Mbps rate for management packets
++in 2G and 5G bands respectively. But when the user selects different
++basic rates from the userspace, we need to send the management
++packets at the lowest basic rate selected by the user.
++
++This change makes use of WMI_VDEV_PARAM_MGMT_RATE param for configuring the
++management packets rate to the firmware.
++
++Chipsets Tested : QCA988X, QCA9887, QCA9984
++FW Tested 	: 10.2.4-1.0-41, 10.4-3.6.104
++
++Signed-off-by: Sriram R <srirrama@codeaurora.org>
++Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
++
++--- a/drivers/net/wireless/ath/ath10k/mac.c
+++++ b/drivers/net/wireless/ath/ath10k/mac.c
++@@ -5758,6 +5758,8 @@ static void ath10k_bss_info_changed(stru
++ 		basic_rate_idx = ffs(vif->bss_conf.basic_rates) - 1;
++ 		bitrate = sband->bitrates[basic_rate_idx].bitrate;
++ 
+++		pr_warn("Set bitrate %d\n", bitrate);
+++
++ 		hw_rate_code = ath10k_mac_get_rate_hw_value(bitrate);
++ 		if (hw_rate_code < 0) {
++ 			ath10k_warn(ar, "bitrate not supported %d\n", bitrate);
