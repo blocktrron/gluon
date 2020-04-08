@@ -38,6 +38,9 @@ packages {
 	'kmod-mt76x2',
 	'kmod-mt7603',
 	'kmod-mt7615e',
+	'kmod-rtw88',
+	'rtl8822be-firmware',
+	'rtl8822ce-firmware'
 }
 
 defaults {
