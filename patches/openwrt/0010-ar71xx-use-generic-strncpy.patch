@@ -1,0 +1,50 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 24 Apr 2020 21:18:17 +0200
+Subject: ar71xx: use generic strncpy
+
+diff --git a/target/linux/ar71xx/patches-4.14/999-stncpy.patch b/target/linux/ar71xx/patches-4.14/999-stncpy.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..04f4128fa7ee6126627fe6e8223deae2058a1fd0
+--- /dev/null
++++ b/target/linux/ar71xx/patches-4.14/999-stncpy.patch
+@@ -0,0 +1,40 @@
++--- a/arch/mips/include/asm/uaccess.h
+++++ b/arch/mips/include/asm/uaccess.h
++@@ -718,36 +718,7 @@ extern long __strncpy_from_user_asm(char
++  * If @count is smaller than the length of the string, copies @count bytes
++  * and returns @count.
++  */
++-static inline long
++-strncpy_from_user(char *__to, const char __user *__from, long __len)
++-{
++-	long res;
++-
++-	if (eva_kernel_access()) {
++-		__asm__ __volatile__(
++-			"move\t$4, %1\n\t"
++-			"move\t$5, %2\n\t"
++-			"move\t$6, %3\n\t"
++-			__MODULE_JAL(__strncpy_from_kernel_asm)
++-			"move\t%0, $2"
++-			: "=r" (res)
++-			: "r" (__to), "r" (__from), "r" (__len)
++-			: "$2", "$3", "$4", "$5", "$6", __UA_t0, "$31", "memory");
++-	} else {
++-		might_fault();
++-		__asm__ __volatile__(
++-			"move\t$4, %1\n\t"
++-			"move\t$5, %2\n\t"
++-			"move\t$6, %3\n\t"
++-			__MODULE_JAL(__strncpy_from_user_asm)
++-			"move\t%0, $2"
++-			: "=r" (res)
++-			: "r" (__to), "r" (__from), "r" (__len)
++-			: "$2", "$3", "$4", "$5", "$6", __UA_t0, "$31", "memory");
++-	}
++-
++-	return res;
++-}
+++extern long strncpy_from_user(char *dst, const char __user *src, long count);
++ 
++ extern long __strnlen_kernel_asm(const char __user *s, long n);
++ extern long __strnlen_user_asm(const char __user *s, long n);
