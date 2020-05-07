@@ -21,7 +21,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ar71xx-generic
           path: output
 
   ar71xx-tiny:
@@ -36,7 +36,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ar71xx-tiny
           path: output
 
   ar71xx-nand:
@@ -51,7 +51,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ar71xx-nand
           path: output
 
   ath79-generic:
@@ -66,7 +66,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ath79-generic
           path: output
 
   brcm2708-bcm2708:
@@ -81,7 +81,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: brcm2708-bcm2708
           path: output
 
   brcm2708-bcm2709:
@@ -96,7 +96,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: brcm2708-bcm2709
           path: output
 
   ipq40xx-generic:
@@ -111,7 +111,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ipq40xx-generic
           path: output
 
   ipq806x-generic:
@@ -126,7 +126,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ipq806x-generic
           path: output
 
   lantiq-xrx200:
@@ -141,7 +141,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: lantiq-xrx200
           path: output
 
   lantiq-xway:
@@ -156,7 +156,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: lantiq-xway
           path: output
 
   mpc85xx-generic:
@@ -171,7 +171,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: mpc85xx-generic
           path: output
 
   mpc85xx-p1020:
@@ -186,7 +186,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: mpc85xx-p1020
           path: output
 
   ramips-mt7620:
@@ -201,7 +201,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ramips-mt7620
           path: output
 
   ramips-mt7621:
@@ -216,7 +216,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ramips-mt7621
           path: output
 
   ramips-mt76x8:
@@ -231,7 +231,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ramips-mt76x8
           path: output
 
   ramips-rt305x:
@@ -246,7 +246,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ramips-rt305x
           path: output
 
   sunxi-cortexa7:
@@ -261,7 +261,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: sunxi-cortexa7
           path: output
 
   x86-generic:
@@ -276,7 +276,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: x86-generic
           path: output
 
   x86-geode:
@@ -291,7 +291,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: x86-geode
           path: output
 
   x86-64:
@@ -306,7 +306,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: x86-64
           path: output
 
   ar71xx-mikrotik:
@@ -321,7 +321,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: ar71xx-mikrotik
           path: output
 
   brcm2708-bcm2710:
@@ -336,7 +336,7 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: brcm2708-bcm2710
           path: output
 
   mvebu-cortexa9:
@@ -351,6 +351,6 @@ jobs:
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: output
+          name: mvebu-cortexa9
           path: output
 
