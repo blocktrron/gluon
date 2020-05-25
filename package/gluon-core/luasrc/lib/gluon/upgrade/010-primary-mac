@@ -40,6 +40,21 @@ local function board(iface)
 	end
 end
 
+local function label_mac(iface)
+	return function()
+		local f = io.popen('gluon-label-mac')
+		if not f then
+			return nil
+		end
+
+		local data = f:read('*l')
+		f:close()
+
+		local mac_pattern = '%w%w:%w%w:%w%w:%w%w:%w%w:%w%w'
+		return string.match(data, mac_pattern)
+	end
+end
+
 
 -- Entries are matched in the order they are listed
 local primary_addrs = {
@@ -132,7 +147,11 @@ local primary_addrs = {
 			'linksys,ea6350v3',
 		}},
 	}},
-	-- phy0 default
+	-- default label-mac from OpenWrt
+	{label_mac(), {
+		{}, -- matches everything
+	}},
+	-- phy0 fallback if label-mac is not specified
 	{phy(0), {
 		{}, -- matches everything
 	}},
