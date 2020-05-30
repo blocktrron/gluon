@@ -10,4 +10,4 @@ export GLUON_TARGET=$1
 export BUILD_LOG=1
 
 make update
-make -j2 V=s
+make -j4 V=s
