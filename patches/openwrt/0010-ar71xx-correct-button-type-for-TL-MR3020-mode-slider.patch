@@ -1,0 +1,38 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 30 May 2020 16:24:03 +0200
+Subject: ar71xx: correct button type for TL-MR3020 mode slider
+
+The TP-Link TL-MR3020 has a three-state mode slider which was previously
+integrated as a button (EV_KEY). This led to spurious activations of
+failsafe mode.
+
+Set the type for the button to switch (EV_SW), to avoid unintended
+activations of failsafe mode.
+
+Fixes commit 27f3f493de06 ("gpio-button-hotplug: unify polled and interrupt
+code")
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/ar71xx/files/arch/mips/ath79/mach-tl-mr3020.c b/target/linux/ar71xx/files/arch/mips/ath79/mach-tl-mr3020.c
+index 0a9dfbc8a0f7374c1512b1a097236c84071d3258..e3b4087effa913ec5ee815c913f0ba8657d630ea 100644
+--- a/target/linux/ar71xx/files/arch/mips/ath79/mach-tl-mr3020.c
++++ b/target/linux/ar71xx/files/arch/mips/ath79/mach-tl-mr3020.c
+@@ -79,7 +79,7 @@ static struct gpio_keys_button tl_mr3020_gpio_keys[] __initdata = {
+ 	},
+ 	{
+ 		.desc		= "sw1",
+-		.type		= EV_KEY,
++		.type		= EV_SW,
+ 		.code		= BTN_0,
+ 		.debounce_interval = TL_MR3020_KEYS_DEBOUNCE_INTERVAL,
+ 		.gpio		= TL_MR3020_GPIO_BTN_SW1,
+@@ -87,7 +87,7 @@ static struct gpio_keys_button tl_mr3020_gpio_keys[] __initdata = {
+ 	},
+ 	{
+ 		.desc		= "sw2",
+-		.type		= EV_KEY,
++		.type		= EV_SW,
+ 		.code		= BTN_1,
+ 		.debounce_interval = TL_MR3020_KEYS_DEBOUNCE_INTERVAL,
+ 		.gpio		= TL_MR3020_GPIO_BTN_SW2,
