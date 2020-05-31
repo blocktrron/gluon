@@ -1,0 +1,22 @@
+no_opkg()
+
+packages {
+	'-uboot-envtools',
+	'-kmod-usb-core',
+	'-kmod-usb-ohci',
+	'-kmod-usb2',
+	'-kmod-usb-ledtrig-usbport',
+}
+
+defaults {
+	deprecated = true, -- 4/32
+	class = 'tiny',
+}
+
+-- TP-Link
+
+device('tp-link-tl-mr3020-v1', 'tplink_tl-mr3020-v1')
+
+device('tp-link-tl-wa901nd-v2', 'tplink_tl-wa901nd-v2')
+
+device('tp-link-tl-wr740n-v1', 'tplink_tl-wr740n-v1')
