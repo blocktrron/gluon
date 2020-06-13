@@ -1,0 +1,23 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 13 Jun 2020 13:23:33 +0200
+Subject: debug
+
+diff --git a/package/kernel/mt76/patches/001-debug.patch b/package/kernel/mt76/patches/001-debug.patch
+index 121e5e045c81236b682aeaa9f369c57ee2962aad..2c3e928b4ea98a3ae2a54f475f93511bae3d80b3 100644
+--- a/package/kernel/mt76/patches/001-debug.patch
++++ b/package/kernel/mt76/patches/001-debug.patch
+@@ -9,3 +9,14 @@
+  #define MT_MAX_VIFS		8
+  
+  #define MT_PKTID_RATE		GENMASK(4, 0)
++--- a/mt76x02_mac.c
+++++ b/mt76x02_mac.c
++@@ -161,6 +161,8 @@ void mt76x02_mac_wcid_setup(struct mt76x
++ 	if (mac)
++ 		memcpy(addr.macaddr, mac, ETH_ALEN);
++ 
+++	pr_warn("WCID: %d - IDX: %d", MT_WCID_ADDR(idx), idx);
+++
++ 	mt76_wr_copy(dev, MT_WCID_ADDR(idx), &addr, sizeof(addr));
++ }
++ EXPORT_SYMBOL_GPL(mt76x02_mac_wcid_setup);
