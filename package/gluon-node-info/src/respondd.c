@@ -33,6 +33,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 
 static struct uci_section * get_first_section(struct uci_package *p, const char *type) {
@@ -70,7 +71,13 @@ static struct json_object * get_number(struct uci_context *ctx, struct uci_secti
 }
 
 static void maybe_add_number(struct uci_context *ctx, struct uci_section *s, const char *name, struct json_object *parent) {
-	struct json_object *jso = get_number(ctx, s, name);
+	char loc_path[] = "/var/gluon/location/";
+	struct json_object *jso;
+	
+	if (access(loc_path, F_OK | R_OK))
+		return;
+	
+	jso = get_number(ctx, s, name);
 	if (jso)
 		json_object_object_add(parent, name, jso);
 }
