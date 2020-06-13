@@ -1,0 +1,17 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 13 Jun 2020 13:59:02 +0200
+Subject: debug
+
+diff --git a/package/kernel/mt76/patches/001-debug.patch b/package/kernel/mt76/patches/001-debug.patch
+index 2c3e928b4ea98a3ae2a54f475f93511bae3d80b3..2da0371ad6a42cbbfabcf02963451da71214639d 100644
+--- a/package/kernel/mt76/patches/001-debug.patch
++++ b/package/kernel/mt76/patches/001-debug.patch
+@@ -15,7 +15,7 @@
+  	if (mac)
+  		memcpy(addr.macaddr, mac, ETH_ALEN);
+  
+-+	pr_warn("WCID: %d - IDX: %d", MT_WCID_ADDR(idx), idx);
+++	pr_warn("WCID: %d - IDX: %d", MT_VIF_WCID(idx), idx);
+ +
+  	mt76_wr_copy(dev, MT_WCID_ADDR(idx), &addr, sizeof(addr));
+  }
