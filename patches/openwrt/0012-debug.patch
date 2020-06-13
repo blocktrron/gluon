@@ -1,22 +1,21 @@
 From: David Bauer <mail@david-bauer.net>
-Date: Sat, 13 Jun 2020 11:44:04 +0200
+Date: Sat, 13 Jun 2020 13:17:41 +0200
 Subject: debug
 
 diff --git a/package/kernel/mt76/patches/001-debug.patch b/package/kernel/mt76/patches/001-debug.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..208d9d7bfe73fdcfab0299f14f01cb014dd83b40
+index 0000000000000000000000000000000000000000..121e5e045c81236b682aeaa9f369c57ee2962aad
 --- /dev/null
 +++ b/package/kernel/mt76/patches/001-debug.patch
-@@ -0,0 +1,12 @@
-+--- a/mt76x02_util.c
-++++ b/mt76x02_util.c
-+@@ -462,7 +462,9 @@ int mt76x02_set_key(struct ieee80211_hw
-+ 	}
-+ 	mt76_wcid_key_setup(&dev->mt76, wcid, key);
+@@ -0,0 +1,11 @@
++--- a/mt76x02_mac.h
+++++ b/mt76x02_mac.h
++@@ -20,7 +20,7 @@ struct mt76x02_tx_status {
++ 	u16 rate;
++ } __packed __aligned(2);
 + 
-++	pr_warn("Set key\n");
-+ 	if (!msta) {
-++		pr_warn("Set mcast key\n");
-+ 		if (key || wcid->hw_key_idx == idx) {
-+ 			ret = mt76x02_mac_wcid_set_key(dev, wcid->idx, key);
-+ 			if (ret)
++-#define MT_VIF_WCID(_n)		(254 - ((_n) & 7))
+++#define MT_VIF_WCID(_n)		(253 - ((_n) & 7))
++ #define MT_MAX_VIFS		8
++ 
++ #define MT_PKTID_RATE		GENMASK(4, 0)
