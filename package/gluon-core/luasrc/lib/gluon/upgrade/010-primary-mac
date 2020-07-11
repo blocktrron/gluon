@@ -135,6 +135,9 @@ local primary_addrs = {
 		{'ramips', 'mt7620', {
 			'xiaomi,miwifi-mini',
 		}},
+		{'rockchip', 'armv8', {
+			'friendlyarm,nanopi-r2s',
+		}},
 	}},
 	{phy(1), {
 		{'ar71xx', 'generic', {
