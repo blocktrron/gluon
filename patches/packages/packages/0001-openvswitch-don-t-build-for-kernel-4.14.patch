@@ -1,0 +1,22 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 22 Jul 2020 19:32:44 +0200
+Subject: openvswitch: don't build for kernel 4.14
+
+Bulding OpenVSwitch currently fails for kernel 4.14. Only build for
+newer kernels to allow ar71xx builds to succeed without other hacks.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/net/openvswitch/Makefile b/net/openvswitch/Makefile
+index f8fc3acaf9d4fb42373f29d0823f1b2f287f4356..2b5274b1c302a7108c1082278fa0cc7485c1a848 100644
+--- a/net/openvswitch/Makefile
++++ b/net/openvswitch/Makefile
+@@ -58,7 +58,7 @@ ifeq ($(if $(call ovs_kmod_is_intree,$(1)),$(ovs_kmod_intree_not_supported)),)
+      CATEGORY:=Kernel modules
+      SUBMENU:=Network Support
+      TITLE:=$(ovs_kmod_$(1)_title)
+-     DEPENDS:=$(ovs_kmod_$(1)_depends) $(if $(call ovs_kmod_is_intree,$(1)),@IPV6 @DEVEL)
++     DEPENDS:=$(ovs_kmod_$(1)_depends) @!LINUX_4_14 $(if $(call ovs_kmod_is_intree,$(1)),@IPV6 @DEVEL)
+      PROVIDES:=$(call ovs_kmod_package_provides,$(1))
+      KCONFIG:=$(ovs_kmod_$(1)_kconfig)
+      FILES:=$(ovs_kmod_$(1)_files)
