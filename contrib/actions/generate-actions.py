@@ -31,7 +31,7 @@ ACTIONS_TARGET="""
           key: openwrt-dl-{target_name}-${{{{ hashFiles('modules') }}}}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build

@@ -25,7 +25,7 @@ jobs:
           key: openwrt-dl-ar71xx-generic-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -57,7 +57,7 @@ jobs:
           key: openwrt-dl-ar71xx-tiny-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -89,7 +89,7 @@ jobs:
           key: openwrt-dl-ar71xx-nand-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -121,7 +121,7 @@ jobs:
           key: openwrt-dl-ath79-generic-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -153,7 +153,7 @@ jobs:
           key: openwrt-dl-brcm2708-bcm2708-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -185,7 +185,7 @@ jobs:
           key: openwrt-dl-brcm2708-bcm2709-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -217,7 +217,7 @@ jobs:
           key: openwrt-dl-ipq40xx-generic-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -249,7 +249,7 @@ jobs:
           key: openwrt-dl-ipq806x-generic-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -281,7 +281,7 @@ jobs:
           key: openwrt-dl-lantiq-xrx200-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -313,7 +313,7 @@ jobs:
           key: openwrt-dl-lantiq-xway-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -345,7 +345,7 @@ jobs:
           key: openwrt-dl-mpc85xx-generic-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -377,7 +377,7 @@ jobs:
           key: openwrt-dl-mpc85xx-p1020-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -409,7 +409,7 @@ jobs:
           key: openwrt-dl-ramips-mt7620-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -441,7 +441,7 @@ jobs:
           key: openwrt-dl-ramips-mt7621-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -473,7 +473,7 @@ jobs:
           key: openwrt-dl-ramips-mt76x8-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -505,7 +505,7 @@ jobs:
           key: openwrt-dl-ramips-rt305x-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -537,7 +537,7 @@ jobs:
           key: openwrt-dl-sunxi-cortexa7-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -569,7 +569,7 @@ jobs:
           key: openwrt-dl-x86-generic-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -601,7 +601,7 @@ jobs:
           key: openwrt-dl-x86-geode-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -633,7 +633,7 @@ jobs:
           key: openwrt-dl-x86-legacy-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -665,7 +665,7 @@ jobs:
           key: openwrt-dl-x86-64-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -697,7 +697,7 @@ jobs:
           key: openwrt-dl-ar71xx-mikrotik-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -729,7 +729,7 @@ jobs:
           key: openwrt-dl-brcm2708-bcm2710-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
@@ -761,7 +761,7 @@ jobs:
           key: openwrt-dl-mvebu-cortexa9-${{ hashFiles('modules') }}
       - name: Prepare download cache
         if: steps.cache-dl.outputs.cache-hit == 'true'
-        run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
+        run: mkdir -p openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
