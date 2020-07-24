@@ -1,0 +1,16 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 24 Jul 2020 15:27:50 +0200
+Subject: download: remove sources CDN
+
+diff --git a/scripts/download.pl b/scripts/download.pl
+index a809c77e7a67a58fd687ead304ababa62c1297df..c14a44ba68b704ed4c6419a336cfb6b3a3cb8ad8 100755
+--- a/scripts/download.pl
++++ b/scripts/download.pl
+@@ -258,7 +258,6 @@ foreach my $mirror (@ARGV) {
+ 	}
+ }
+ 
+-unshift @mirrors, 'https://sources.cdn.openwrt.org';
+ #push @mirrors, 'https://mirror1.openwrt.org';
+ push @mirrors, 'https://sources.openwrt.org';
+ push @mirrors, 'https://mirror2.openwrt.org/sources';
