@@ -30,14 +30,14 @@ ACTIONS_TARGET="""
           path: dl_target
           key: openwrt-dl-{target_name}-${{{{ hashFiles('modules') }}}}
       - name: Prepare download cache
-        if: steps.cache-primes.outputs.cache-hit == 'true'
+        if: steps.cache-dl.outputs.cache-hit == 'true'
         run: mkdir openwrt/dl; mv dl_target/* openwrt/dl/; ls openwrt/dl
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
         run: contrib/actions/run-build.sh {target_name}
       - name: Create cache to save
-        if: steps.cache-primes.outputs.cache-hit != 'true'
+        if: steps.cache-dl.outputs.cache-hit != 'true'
         run: mkdir dl_target; mv openwrt/dl/* dl_target/; find dl_target/ -size +20M -delete
       - name: Archive build logs
         if: ${{{{ !cancelled() }}}}
