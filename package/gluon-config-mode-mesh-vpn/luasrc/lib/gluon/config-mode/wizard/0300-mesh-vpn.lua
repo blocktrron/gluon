@@ -1,10 +1,8 @@
-local unistd = require 'posix.unistd'
-
-local has_fastd = unistd.access('/lib/gluon/mesh-vpn/fastd')
-local has_tunneldigger = unistd.access('/lib/gluon/mesh-vpn/tunneldigger')
+local vpn = require('gluon.mesh-vpn.core')
+local active_vpn = vpn.get_active_method()
 
 return function(form, uci)
-	if not (has_fastd or has_tunneldigger) then
+	if active_vpn == nil then
 		return
 	end
 
@@ -64,5 +62,11 @@ return function(form, uci)
 		os.execute('exec /lib/gluon/mesh-vpn/update-config')
 	end
 
-	return {'gluon', 'fastd', 'tunneldigger', 'simple-tc'}
+	local uci_sections = {'gluon', 'simple-tc'}
+
+	for _, section in ipairs(active_vpn.uci_sections()) do
+		table.insert(uci_sections, section)
+	end
+
+	return {'gluon', 'simple-tc'}
 end

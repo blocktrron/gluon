@@ -11,9 +11,10 @@
 
 
 	local pubkey
-	local meshvpn_enabled = uci:get_bool("fastd", "mesh_vpn", "enabled")
-	if meshvpn_enabled then
-		pubkey = util.trim(util.exec('/etc/init.d/fastd show_key mesh_vpn'))
+	local vpn = require('gluon.mesh-vpn.core')
+	if vpn.enabled() then
+		local active_vpn = vpn.get_active_method()
+		pubkey = active_vpn.public_key()
 		if pubkey == '' then
 			pubkey = nil
 		end
