@@ -52,12 +52,9 @@ for _, zone in ipairs({'mesh', 'loc_client', 'wired_mesh'}) do
 		family = 'ipv6',
 		target = 'ACCEPT',
 	})
-
-	-- Can be removed soon: was never in a release
-	uci:delete('firewall', zone .. '_ICMPv6_out')
 end
 
--- ToDo Remove in v2022.x
+--  Remove in v2022.x
 uci:delete('firewall', 'local_client')
 uci:delete('firewall', 'local_client_ssh')
 uci:delete('firewall', 'local_client_ICMPv4_in')
