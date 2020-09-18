@@ -13,69 +13,6 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
 
-  ar71xx-generic:
-    name: ar71xx-generic
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Dependencies
-        run: sudo contrib/actions/install-dependencies.sh
-      - name: Build
-        run: contrib/actions/run-build.sh ar71xx-generic
-      - name: Archive build logs
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v1
-        with:
-          name: ar71xx-generic_logs
-          path: openwrt/logs
-      - name: Archive build output
-        uses: actions/upload-artifact@v1
-        with:
-          name: ar71xx-generic_output
-          path: output
-
-  ar71xx-tiny:
-    name: ar71xx-tiny
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Dependencies
-        run: sudo contrib/actions/install-dependencies.sh
-      - name: Build
-        run: contrib/actions/run-build.sh ar71xx-tiny
-      - name: Archive build logs
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v1
-        with:
-          name: ar71xx-tiny_logs
-          path: openwrt/logs
-      - name: Archive build output
-        uses: actions/upload-artifact@v1
-        with:
-          name: ar71xx-tiny_output
-          path: output
-
-  ar71xx-nand:
-    name: ar71xx-nand
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - name: Install Dependencies
-        run: sudo contrib/actions/install-dependencies.sh
-      - name: Build
-        run: contrib/actions/run-build.sh ar71xx-nand
-      - name: Archive build logs
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v1
-        with:
-          name: ar71xx-nand_logs
-          path: openwrt/logs
-      - name: Archive build output
-        uses: actions/upload-artifact@v1
-        with:
-          name: ar71xx-nand_output
-          path: output
-
   ath79-generic:
     name: ath79-generic
     runs-on: ubuntu-latest
@@ -97,46 +34,67 @@ jobs:
           name: ath79-generic_output
           path: output
 
-  brcm2708-bcm2708:
-    name: brcm2708-bcm2708
+  ath79-nand:
+    name: ath79-nand
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
-        run: contrib/actions/run-build.sh brcm2708-bcm2708
+        run: contrib/actions/run-build.sh ath79-nand
       - name: Archive build logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v1
         with:
-          name: brcm2708-bcm2708_logs
+          name: ath79-nand_logs
           path: openwrt/logs
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: brcm2708-bcm2708_output
+          name: ath79-nand_output
           path: output
 
-  brcm2708-bcm2709:
-    name: brcm2708-bcm2709
+  bcm27xx-bcm2708:
+    name: bcm27xx-bcm2708
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
-        run: contrib/actions/run-build.sh brcm2708-bcm2709
+        run: contrib/actions/run-build.sh bcm27xx-bcm2708
       - name: Archive build logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v1
         with:
-          name: brcm2708-bcm2709_logs
+          name: bcm27xx-bcm2708_logs
           path: openwrt/logs
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: brcm2708-bcm2709_output
+          name: bcm27xx-bcm2708_output
+          path: output
+
+  bcm27xx-bcm2709:
+    name: bcm27xx-bcm2709
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Dependencies
+        run: sudo contrib/actions/install-dependencies.sh
+      - name: Build
+        run: contrib/actions/run-build.sh bcm27xx-bcm2709
+      - name: Archive build logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v1
+        with:
+          name: bcm27xx-bcm2709_logs
+          path: openwrt/logs
+      - name: Archive build output
+        uses: actions/upload-artifact@v1
+        with:
+          name: bcm27xx-bcm2709_output
           path: output
 
   ipq40xx-generic:
@@ -223,25 +181,25 @@ jobs:
           name: lantiq-xway_output
           path: output
 
-  mpc85xx-generic:
-    name: mpc85xx-generic
+  mpc85xx-p1010:
+    name: mpc85xx-p1010
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
-        run: contrib/actions/run-build.sh mpc85xx-generic
+        run: contrib/actions/run-build.sh mpc85xx-p1010
       - name: Archive build logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v1
         with:
-          name: mpc85xx-generic_logs
+          name: mpc85xx-p1010_logs
           path: openwrt/logs
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: mpc85xx-generic_output
+          name: mpc85xx-p1010_output
           path: output
 
   mpc85xx-p1020:
@@ -349,6 +307,27 @@ jobs:
           name: ramips-rt305x_output
           path: output
 
+  rockchip-armv8:
+    name: rockchip-armv8
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Dependencies
+        run: sudo contrib/actions/install-dependencies.sh
+      - name: Build
+        run: contrib/actions/run-build.sh rockchip-armv8
+      - name: Archive build logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v1
+        with:
+          name: rockchip-armv8_logs
+          path: openwrt/logs
+      - name: Archive build output
+        uses: actions/upload-artifact@v1
+        with:
+          name: rockchip-armv8_output
+          path: output
+
   sunxi-cortexa7:
     name: sunxi-cortexa7
     runs-on: ubuntu-latest
@@ -454,46 +433,46 @@ jobs:
           name: x86-64_output
           path: output
 
-  ar71xx-mikrotik:
-    name: ar71xx-mikrotik
+  bcm27xx-bcm2710:
+    name: bcm27xx-bcm2710
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
-        run: contrib/actions/run-build.sh ar71xx-mikrotik
+        run: contrib/actions/run-build.sh bcm27xx-bcm2710
       - name: Archive build logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v1
         with:
-          name: ar71xx-mikrotik_logs
+          name: bcm27xx-bcm2710_logs
           path: openwrt/logs
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: ar71xx-mikrotik_output
+          name: bcm27xx-bcm2710_output
           path: output
 
-  brcm2708-bcm2710:
-    name: brcm2708-bcm2710
+  bcm27xx-bcm2711:
+    name: bcm27xx-bcm2711
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
       - name: Install Dependencies
         run: sudo contrib/actions/install-dependencies.sh
       - name: Build
-        run: contrib/actions/run-build.sh brcm2708-bcm2710
+        run: contrib/actions/run-build.sh bcm27xx-bcm2711
       - name: Archive build logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v1
         with:
-          name: brcm2708-bcm2710_logs
+          name: bcm27xx-bcm2711_logs
           path: openwrt/logs
       - name: Archive build output
         uses: actions/upload-artifact@v1
         with:
-          name: brcm2708-bcm2710_output
+          name: bcm27xx-bcm2711_output
           path: output
 
   mvebu-cortexa9:
