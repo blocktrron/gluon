@@ -1,0 +1,17 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Tue, 24 Nov 2020 01:40:58 +0100
+Subject: ath79: build as MIPS74Kc
+
+diff --git a/target/linux/ath79/Makefile b/target/linux/ath79/Makefile
+index e074cde8cedf3d44a12fb4891c6bc72845667acb..b1990d74ce988ff9346a91b30155a836a2161cdf 100644
+--- a/target/linux/ath79/Makefile
++++ b/target/linux/ath79/Makefile
+@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
+ ARCH:=mips
+ BOARD:=ath79
+ BOARDNAME:=Atheros ATH79
+-CPU_TYPE:=24kc
++CPU_TYPE:=74kc
+ SUBTARGETS:=generic mikrotik nand tiny
+ 
+ FEATURES:=ramdisk usbgadget
