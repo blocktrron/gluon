@@ -1,0 +1,335 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 12 Dec 2020 14:34:00 +0100
+Subject: ramips: add support for Ubiquiti UniFi6 Lite
+
+Hardware
+--------
+MediaTek MT7621AT
+256M DDR3
+32M SPI-NOR
+MediaTek MT7603 2T2R 802.11n 2.4GHz
+MediaTek MT7915 2T2R 802.11ax 5GHz
+
+Installation
+------------
+
+FIT configurations
+------------------
+
+In the future, the MT7621 UniFi6 family can be supported by a single
+OpenWrt image.
+
+config@1: U6 Lite
+config@2: U6 IW
+config@3: U6 Mesh
+config@4: U6 Extender
+config@5: U6 LR-EA (Early Access - GA is MT7622)
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/ramips/dts/mt7621_ubnt_unifi-nanohd.dts b/target/linux/ramips/dts/mt7621_ubnt_unifi-nanohd.dts
+index 4ba5f6a428d163042599e7b1d646a468dced9e4f..401868362e2fe1bd29c3af965455ff97ec6107d7 100644
+--- a/target/linux/ramips/dts/mt7621_ubnt_unifi-nanohd.dts
++++ b/target/linux/ramips/dts/mt7621_ubnt_unifi-nanohd.dts
+@@ -1,49 +1,10 @@
+ // SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+ 
+-#include "mt7621.dtsi"
+-
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
++#include "mt7621_ubnt_unifi.dtsi"
+ 
+ / {
+ 	compatible = "ubnt,unifi-nanohd", "mediatek,mt7621-soc";
+ 	model = "Ubiquiti UniFi nanoHD";
+-
+-	aliases {
+-		led-boot = &led_white;
+-		led-failsafe = &led_white;
+-		led-running = &led_blue;
+-		led-upgrade = &led_blue;
+-		label-mac-device = &gmac0;
+-	};
+-
+-	chosen {
+-		bootargs = "console=ttyS0,115200";
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-
+-		led_blue: dome_blue {
+-			label = "blue:dome";
+-			gpios = <&gpio 3 GPIO_ACTIVE_HIGH>;
+-		};
+-
+-		led_white: dome_white {
+-			label = "white:dome";
+-			gpios = <&gpio 4 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-
+-	keys {
+-		compatible = "gpio-keys";
+-
+-		reset {
+-			label = "reset";
+-			gpios = <&gpio 12 GPIO_ACTIVE_LOW>;
+-			linux,code = <KEY_RESTART>;
+-		};
+-	};
+ };
+ 
+ &spi0 {
+@@ -109,40 +70,6 @@
+ 	};
+ };
+ 
+-&pcie {
+-	status = "okay";
+-};
+-
+-&pcie0 {
+-	wifi@0,0 {
+-		reg = <0x0 0 0 0 0>;
+-		mediatek,mtd-eeprom = <&factory 0x0000>;
+-	};
+-};
+-
+-&pcie1 {
+-	wifi@0,0 {
+-		reg = <0x0 0 0 0 0>;
+-		mediatek,mtd-eeprom = <&factory 0x8000>;
+-	};
+-};
+-
+-&gmac0 {
+-	mtd-mac-address = <&eeprom 0x0>;
+-};
+-
+-&switch0 {
+-	ports {
+-		port@0 {
+-			status = "okay";
+-			label = "lan";
+-		};
+-	};
+-};
+-
+-&state_default {
+-	gpio {
+-		groups = "i2c", "uart2";
+-		function = "gpio";
+-	};
++&wlan_5g {
++	mediatek,mtd-eeprom = <&factory 0x8000>;
+ };
+diff --git a/target/linux/ramips/dts/mt7621_ubnt_unifi.dtsi b/target/linux/ramips/dts/mt7621_ubnt_unifi.dtsi
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a27899b56442c5f3b4f027ccf66e340241f9057
+--- /dev/null
++++ b/target/linux/ramips/dts/mt7621_ubnt_unifi.dtsi
+@@ -0,0 +1,82 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++#include "mt7621.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	aliases {
++		led-boot = &led_white;
++		led-failsafe = &led_white;
++		led-running = &led_blue;
++		led-upgrade = &led_blue;
++		label-mac-device = &gmac0;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led_blue: dome_blue {
++			label = "blue:dome";
++			gpios = <&gpio 3 GPIO_ACTIVE_HIGH>;
++		};
++
++		led_white: dome_white {
++			label = "white:dome";
++			gpios = <&gpio 4 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	keys {
++		compatible = "gpio-keys";
++
++		reset {
++			label = "reset";
++			gpios = <&gpio 12 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RESTART>;
++		};
++	};
++};
++
++&pcie {
++	status = "okay";
++};
++
++&pcie0 {
++	wlan_2g: wifi@0,0 {
++		reg = <0x0 0 0 0 0>;
++		mediatek,mtd-eeprom = <&factory 0x0000>;
++	};
++};
++
++&pcie1 {
++	wlan_5g: wifi@0,0 {
++		reg = <0x0 0 0 0 0>;
++		mediatek,mtd-eeprom = <&factory 0x8000>;
++	};
++};
++
++&gmac0 {
++	mtd-mac-address = <&eeprom 0x0>;
++};
++
++&switch0 {
++	ports {
++		port@0 {
++			status = "okay";
++			label = "lan";
++		};
++	};
++};
++
++&state_default {
++	gpio {
++		groups = "i2c", "uart2";
++		function = "gpio";
++	};
++};
+diff --git a/target/linux/ramips/dts/mt7621_ubnt_unifi6-lite.dts b/target/linux/ramips/dts/mt7621_ubnt_unifi6-lite.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f617411b925300026769e4aa5f0c6c97ad3250c0
+--- /dev/null
++++ b/target/linux/ramips/dts/mt7621_ubnt_unifi6-lite.dts
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++#include "mt7621_ubnt_unifi.dtsi"
++
++/ {
++	compatible = "ubnt,unifi6-lite", "mediatek,mt7621-soc";
++	model = "Ubiquiti UniFi6 Lite";
++};
++
++&spi0 {
++	status = "okay";
++
++	flash@0 {
++		compatible = "mx25l25635f", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition@0 {
++				label = "u-boot";
++				reg = <0x0 0x60000>;
++			};
++
++			partition@60000 {
++				label = "u-boot-env";
++				reg = <0x60000 0x10000>;
++				read-only;
++			};
++
++			factory: partition@70000 {
++				label = "factory";
++				reg = <0x70000 0x40000>;
++				read-only;
++			};
++
++			eeprom: partition@80000 {
++				label = "eeprom";
++				reg = <0xb0000 0x10000>;
++				read-only;
++			};
++
++			partition@90000 {
++				label = "bs";
++				reg = <0xc0000 0x10000>;
++			};
++
++			partition@a0000 {
++				label = "cfg";
++				reg = <0xd0000 0x100000>;
++				read-only;
++			};
++
++			partition@1a0000 {
++				compatible = "denx,fit";
++				label = "firmware";
++				reg = <0x1d0000 0xf10000>;
++			};
++
++			partition@10d0000 {
++				label = "kernel1";
++				reg = <0x10e0000 0xf10000>;
++				read-only;
++			};
++		};
++	};
++};
++
++&wlan_2g {
++	mtd-mac-address = <&eeprom 0x0>;
++};
++
++&wlan_5g {
++	mediatek,mtd-eeprom = <&factory 0x20000>;
++	mtd-mac-address = <&eeprom 0x6>;
++};
+diff --git a/target/linux/ramips/image/mt7621.mk b/target/linux/ramips/image/mt7621.mk
+index fad18552c9be193fe3c330736fc8deb44119aad8..0486bdcfe9bd142bb61795da7724b2ca7fc6b8ba 100644
+--- a/target/linux/ramips/image/mt7621.mk
++++ b/target/linux/ramips/image/mt7621.mk
+@@ -1103,6 +1103,16 @@ define Device/ubnt_unifi-nanohd
+ endef
+ TARGET_DEVICES += ubnt_unifi-nanohd
+ 
++define Device/ubnt_unifi6-lite
++  $(Device/dsa-migration)
++  DEVICE_VENDOR := Ubiquiti
++  DEVICE_MODEL := UniFi6 Lite
++  DEVICE_PACKAGES += kmod-mt7603 kmod-mt7915e
++  KERNEL := kernel-bin | append-dtb | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
++  IMAGE_SIZE := 15424k
++endef
++TARGET_DEVICES += ubnt_unifi6-lite
++
+ define Device/unielec_u7621-06-16m
+   $(Device/dsa-migration)
+   $(Device/uimage-lzma-loader)
+diff --git a/target/linux/ramips/mt7621/base-files/etc/board.d/02_network b/target/linux/ramips/mt7621/base-files/etc/board.d/02_network
+index c5b35145f106eaacf334dd44aa55975747dce783..6af5ba1810d0c84368d95a24470d89a24b8275a6 100755
+--- a/target/linux/ramips/mt7621/base-files/etc/board.d/02_network
++++ b/target/linux/ramips/mt7621/base-files/etc/board.d/02_network
+@@ -28,7 +28,8 @@ ramips_setup_interfaces()
+ 	tplink,re350-v1|\
+ 	tplink,re500-v1|\
+ 	tplink,re650-v1|\
+-	ubnt,unifi-nanohd)
++	ubnt,unifi-nanohd|\
++	ubnt,unifi6-lite)
+ 		ucidef_set_interface_lan "lan"
+ 		;;
+ 	gehua,ghl-r-001|\

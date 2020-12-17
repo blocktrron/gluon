@@ -1,0 +1,22 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 13 Dec 2020 20:03:51 +0100
+Subject: ramips: mt7621: enable FIT MTD splitter support
+
+The Ubiquiti UniFi6 Lite only boots FIT images, no legacy U-Boot images.
+Enable the FIT MTDsplit driver in order to support automatic kernel
+rootfs split.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/ramips/mt7621/config-5.4 b/target/linux/ramips/mt7621/config-5.4
+index b4c8ab1f1c36f0eac160fe1e289988dd3d6b24a2..9cf179369deb7467809f63a981ec02f912d75c44 100644
+--- a/target/linux/ramips/mt7621/config-5.4
++++ b/target/linux/ramips/mt7621/config-5.4
+@@ -209,6 +209,7 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_MTD_RAW_NAND=y
+ CONFIG_MTD_ROUTERBOOT_PARTS=y
+ CONFIG_MTD_SPI_NOR=y
++CONFIG_MTD_SPLIT_FIT_FW=y
+ CONFIG_MTD_SPLIT_MINOR_FW=y
+ CONFIG_MTD_SPLIT_SEAMA_FW=y
+ CONFIG_MTD_SPLIT_TPLINK_FW=y
