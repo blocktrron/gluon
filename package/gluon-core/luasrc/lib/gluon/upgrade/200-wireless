@@ -74,7 +74,9 @@ local function get_htmode(radio)
 	end
 
 	local phy = wireless.find_phy(radio)
-	if iwinfo.nl80211.hwmodelist(phy).ac then
+	if iwinfo.nl80211.hwmodelist(phy).ax then
+		return 'HE20'
+	elseif iwinfo.nl80211.hwmodelist(phy).ac then
 		return 'VHT20'
 	end
 
