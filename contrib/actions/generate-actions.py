@@ -14,6 +14,7 @@ on:
       - next
       - v20*
     paths:
+      - "contrib/actions/run-build.sh"
       - "modules"
       - "Makefile"
       - "scripts/**"
@@ -24,6 +25,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - "contrib/actions/run-build.sh"
       - "modules"
       - "Makefile"
       - "scripts/**"
