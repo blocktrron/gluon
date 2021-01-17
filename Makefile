@@ -63,11 +63,16 @@ define GLUON_BASE_FEEDS ?=
 src-link gluon_base ../../package
 endef
 
+# Only call if GLUON_DL_DIR is defined
+ifneq ($(GLUON_DL_DIR),)
+  $(eval $(call mkabspath,GLUON_DL_DIR))
+endif
+
 GLUON_VARS = \
 	GLUON_RELEASE GLUON_REGION GLUON_MULTIDOMAIN GLUON_AUTOREMOVE GLUON_DEBUG GLUON_MINIFY GLUON_DEPRECATED \
 	GLUON_DEVICES GLUON_TARGETSDIR GLUON_PATCHESDIR GLUON_TMPDIR GLUON_IMAGEDIR GLUON_PACKAGEDIR GLUON_DEBUGDIR \
 	GLUON_SITEDIR GLUON_AUTOUPDATER_BRANCH GLUON_AUTOUPDATER_ENABLED GLUON_LANGS GLUON_BASE_FEEDS \
-	GLUON_TARGET BOARD SUBTARGET
+	GLUON_TARGET GLUON_DL_DIR BOARD SUBTARGET
 
 unexport $(GLUON_VARS)
 GLUON_ENV = $(foreach var,$(GLUON_VARS),$(var)=$(call escape,$($(var))))
@@ -149,15 +154,23 @@ lint-lua: FORCE
 lint-sh: FORCE
 	@scripts/lint-sh.sh
 
+$(GLUON_DL_DIR):
+	+@
+	mkdir -p $(GLUON_DL_DIR)
 
 LUA := openwrt/staging_dir/hostpkg/bin/lua
 
-$(LUA):
+$(LUA): $(GLUON_DL_DIR)
 	+@
 
 	scripts/module_check.sh
 
-	[ -e openwrt/.config ] || $(OPENWRTMAKE) defconfig
+	rm -f openwrt/.config
+	if [ -n '$(GLUON_DL_DIR)' ]; then
+		echo "CONFIG_DEVEL=y" > openwrt/.config
+		echo "CONFIG_DOWNLOAD_FOLDER=\"$(GLUON_DL_DIR)\"" >> openwrt/.config
+	fi
+	$(OPENWRTMAKE) defconfig
 	$(OPENWRTMAKE) tools/install
 	$(OPENWRTMAKE) package/lua/host/compile
 

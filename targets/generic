@@ -67,6 +67,10 @@ if istrue(env.GLUON_DEBUG) then
 	try_config('TARGET_ROOTFS_PARTSIZE', 500)
 end
 
+if env.GLUON_DL_DIR ~= nil then
+	config('DOWNLOAD_FOLDER', env.GLUON_DL_DIR)
+end
+
 config('GLUON_MINIFY', istrue(env.GLUON_MINIFY))
 
 packages {

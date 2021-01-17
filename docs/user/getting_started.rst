@@ -226,6 +226,11 @@ GLUON_DEBUG
   Setting ``GLUON_DEBUG=1`` will provide firmware images including debugging symbols usable with GDB or
   similar tools. Requires a device or target with at least 16 MB of flash space, e.g. `x86-64`. Unset by default.
 
+GLUON_DL_DIR
+  ``GLUON_DL_DIR`` allows to change the directory the source downloads will be saved to.
+  This allows to cache the source downloads used for te toolchain and the resulting images or
+  obtain them from a network share. If ``GLUON_DL_DIR`` is not set, the OpenWrt default is used.
+
 GLUON_MINIFY
   Setting ``GLUON_MINIFY=0`` will omit the minification of scripts during the build process. By
   default the flag is set to ``1``. Disabling the flag is handy if human readable scripts on the
