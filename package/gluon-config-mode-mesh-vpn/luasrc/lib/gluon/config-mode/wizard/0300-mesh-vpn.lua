@@ -68,5 +68,5 @@ return function(form, uci)
 		table.insert(uci_sections, section)
 	end
 
-	return {'gluon', 'simple-tc'}
+	return uci_sections
 end
