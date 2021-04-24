@@ -19,7 +19,8 @@ local msg
 if vpn.enabled() then
 	local active_vpn = vpn.get_active_method()
 	pubkey = active_vpn.public_key()
-	msg = site_i18n._translate('gluon-config-mode:pubkey')
+	if pubkey then
+		msg = site_i18n._translate('gluon-config-mode:pubkey')
 else
 	msg = site_i18n._translate('gluon-config-mode:novpn')
 end
