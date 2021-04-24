@@ -5,6 +5,7 @@ local uci = require("simple-uci").cursor()
 local platform = require 'gluon.platform'
 local site = require 'gluon.site'
 local sysconfig = require 'gluon.sysconfig'
+local vpn = require 'gluon.mesh-vpn.core'
 
 local pretty_hostname = require 'pretty_hostname'
 
@@ -14,7 +15,6 @@ local contact = uci:get_first("gluon-node-info", "owner", "contact")
 local pubkey
 local msg
 
-local vpn = require('gluon.mesh-vpn.core')
 
 if vpn.enabled() then
 	local active_vpn = vpn.get_active_method()
