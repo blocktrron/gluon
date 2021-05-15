@@ -17,7 +17,7 @@ local msg
 
 
 if vpn.enabled() then
-	local _, active_vpn = vpn.get_active_proto()
+	local _, active_vpn = vpn.get_active_provider()
 	pubkey = active_vpn.public_key()
 
 	if pubkey ~= nil then

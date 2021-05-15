@@ -35,7 +35,7 @@ uci:save('firewall')
 
 -- VPN migration
 if not uci:get('gluon', 'mesh_vpn') then
-	local vpn, _ = vpn_core.get_active_proto()
+	local vpn, _ = vpn_core.get_active_provider()
 
 	local fastd_enabled = uci:get('fastd', 'mesh_vpn', 'enabled')
 	local tunneldigger_enabled = uci:get('tunneldigger', 'mesh_vpn', 'enabled')

@@ -1,7 +1,7 @@
 #!/usr/bin/lua
 
 local uci = require('simple-uci').cursor()
-local vpn_name, vpn = require('gluon.mesh-vpn').get_active_proto()
+local vpn_name, vpn = require('gluon.mesh-vpn').get_active_provider()
 
 local vpn_config = {
 	enabled = uci:get_bool('gluon', 'mesh_vpn', 'enabled'),

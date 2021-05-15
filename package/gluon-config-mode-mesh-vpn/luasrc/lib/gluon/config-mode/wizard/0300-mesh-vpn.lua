@@ -1,5 +1,5 @@
 local vpn = require 'gluon.mesh-vpn'
-local _, active_vpn = vpn.get_active_proto()
+local _, active_vpn = vpn.get_active_provider()
 
 return function(form, uci)
 	if active_vpn == nil then
