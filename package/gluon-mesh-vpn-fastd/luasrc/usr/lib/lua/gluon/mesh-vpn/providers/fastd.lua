@@ -24,7 +24,7 @@ function M.set_limit(ingress_limit, egress_limit)
 	if ingress_limit ~= nil and egress_limit ~= nil then
 		uci:section('simple-tc', 'interface', 'mesh_vpn', {
 			ifname = vpn_core.get_interface(),
-			enabled = 1,
+			enabled = true,
 			limit_egress = egress_limit,
 			limit_ingress = ingress_limit,
 		})
