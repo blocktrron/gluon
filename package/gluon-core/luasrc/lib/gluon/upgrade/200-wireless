@@ -78,6 +78,10 @@ local function get_htmode(radio)
 		return 'VHT20'
 	end
 
+	if iwinfo.nl80211.hwmodelist(phy).ax then
+		return 'HE20'
+	end
+
 	return 'HT20'
 end
 
