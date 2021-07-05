@@ -23,4 +23,4 @@ LDFLAGS_JSONC = $(shell pkg-config --libs json-c)
 all: stations
 
 stations: stations.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_JSONC) $(LDFLAGS) $(LDFLAGS_JSONC) -Wall -o $@ $^ $(LDLIBS) -liwinfo
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_JSONC) $(LDFLAGS) $(LDFLAGS_JSONC) -Wall -o $@ $^ $(LDLIBS) -liwinfo -lgluonutil

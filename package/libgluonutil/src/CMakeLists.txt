@@ -4,7 +4,7 @@ project(libgluonutil C)
 
 set_property(DIRECTORY PROPERTY COMPILE_DEFINITIONS _GNU_SOURCE)
 
-add_library(gluonutil SHARED libgluonutil.c)
+add_library(gluonutil SHARED libgluonutil.c libgluonutil-wireless.c)
 set_property(TARGET gluonutil PROPERTY COMPILE_FLAGS "-Wall -std=c99")
 target_link_libraries(gluonutil json-c uci)
 install(TARGETS gluonutil

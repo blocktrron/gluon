@@ -30,41 +30,13 @@
 #include <iwinfo.h>
 #include <json-c/json.h>
 
+#include <libgluonutil.h>
 
 static struct json_object * get_wifi_neighbours(const char *ifname) {
-	const struct iwinfo_ops *iw = iwinfo_backend(ifname);
-	if (!iw)
-		return NULL;
-
-	int len;
-	char buf[IWINFO_BUFSIZE];
-	if (iw->assoclist(ifname, buf, &len) < 0)
-		return NULL;
-
-	struct json_object *neighbours = json_object_new_object();
-
-	struct iwinfo_assoclist_entry *entry;
-	for (entry = (struct iwinfo_assoclist_entry *)buf; (char*)(entry+1) <= buf + len; entry++) {
-		if (entry->inactive > MAX_INACTIVITY)
-			continue;
-
-		struct json_object *obj = json_object_new_object();
-
-		json_object_object_add(obj, "signal", json_object_new_int(entry->signal));
-		json_object_object_add(obj, "noise", json_object_new_int(entry->noise));
-		json_object_object_add(obj, "inactive", json_object_new_int(entry->inactive));
-
-		char mac[18];
-		snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x",
-			 entry->mac[0], entry->mac[1], entry->mac[2],
-			 entry->mac[3], entry->mac[4], entry->mac[5]);
-
-		json_object_object_add(neighbours, mac, obj);
-	}
-
+	struct json_object *neighbours = gluonutil_get_stations(ifname);
 	struct json_object *ret = json_object_new_object();
 
-	if (json_object_object_length(neighbours))
+	if (neighbours && json_object_object_length(neighbours))
 		json_object_object_add(ret, "neighbours", neighbours);
 	else
 		json_object_put(neighbours);

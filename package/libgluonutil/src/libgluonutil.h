@@ -57,4 +57,6 @@ char * gluonutil_get_domain(void);
 char * gluonutil_get_primary_domain(void);
 struct json_object * gluonutil_load_site_config(void);
 
+struct json_object *gluonutil_get_stations(const char *ifname);
+
 #endif /* _LIBGLUON_LIBGLUON_H_ */
