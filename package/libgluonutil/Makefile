@@ -13,7 +13,7 @@ define Package/libgluonutil
   SECTION:=libs
   CATEGORY:=Libraries
   TITLE:=Gluon utility library
-  DEPENDS:=+libjson-c +libuci +iwinfo
+  DEPENDS:=+libjson-c +libuci +libnl-tiny
 endef
 
 define Package/libgluonutil/install
