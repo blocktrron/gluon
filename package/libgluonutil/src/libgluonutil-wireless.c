@@ -63,14 +63,41 @@ static int get_noise_handler(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
+static json_object *get_station_handler_parse_rate(struct nlattr *bitrate_attr) {
+	struct nlattr *rate_info[NL80211_RATE_INFO_MAX + 1];
+	static struct nla_policy rate_policy[NL80211_RATE_INFO_MAX + 1] = {
+		[NL80211_RATE_INFO_BITRATE] = { .type = NLA_U16 },
+		[NL80211_RATE_INFO_BITRATE32] = { .type = NLA_U32 },
+		[NL80211_RATE_INFO_MCS] = { .type = NLA_U8 },
+		[NL80211_RATE_INFO_40_MHZ_WIDTH] = { .type = NLA_FLAG },
+		[NL80211_RATE_INFO_SHORT_GI] = { .type = NLA_FLAG },
+	};
+
+	struct json_object *rate_obj;
+
+	if (nla_parse_nested(rate_info, NL80211_RATE_INFO_MAX, bitrate_attr, rate_policy))
+		return NULL;
+
+	rate_obj = json_object_new_object();
+	json_object_object_add(rate_obj, "rate", json_object_new_int(nla_get_u32(rate_info[NL80211_RATE_INFO_BITRATE32]) * 10));
+
+	return rate_obj;
+}
+
 static int get_station_handler(struct nl_msg *msg, void *arg) {
 	struct nl_station_data *data = (struct nl_station_data *) arg;
 
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
 
-	struct nlattr *sinfo[NL80211_STA_INFO_MAX + 1];
+	struct nlattr *station_info[NL80211_STA_INFO_MAX + 1];
 	static struct nla_policy stats_policy[NL80211_STA_INFO_MAX + 1] = {
 		[NL80211_STA_INFO_INACTIVE_TIME] = { .type = NLA_U32 },
+		[NL80211_STA_INFO_RX_BYTES] = { .type = NLA_U32 },
+		[NL80211_STA_INFO_TX_BYTES] = { .type = NLA_U32 },
+		[NL80211_STA_INFO_RX_PACKETS] = { .type = NLA_U32 },
+		[NL80211_STA_INFO_TX_PACKETS] = { .type = NLA_U32 },
+		[NL80211_STA_INFO_RX_BITRATE] = { .type = NLA_NESTED },
+		[NL80211_STA_INFO_TX_BITRATE] = { .type = NLA_NESTED },
 		[NL80211_STA_INFO_SIGNAL] = { .type = NLA_U8 },
 	};
 
@@ -85,7 +112,7 @@ static int get_station_handler(struct nl_msg *msg, void *arg) {
 		return NL_SKIP;
 	}
 
-	if (nla_parse_nested(sinfo, NL80211_STA_INFO_MAX,
+	if (nla_parse_nested(station_info, NL80211_STA_INFO_MAX,
 			     tb[NL80211_ATTR_STA_INFO],
 			     stats_policy)) {
 		return NL_SKIP;
@@ -98,9 +125,19 @@ static int get_station_handler(struct nl_msg *msg, void *arg) {
 		 nla_mac_ptr[0], nla_mac_ptr[1], nla_mac_ptr[2],
 		 nla_mac_ptr[3], nla_mac_ptr[4], nla_mac_ptr[5]);
 
-	json_object_object_add(station, "inactive", json_object_new_int(nla_get_u32(sinfo[NL80211_STA_INFO_INACTIVE_TIME])));
-	json_object_object_add(station, "signal", json_object_new_int((int8_t)nla_get_u8(sinfo[NL80211_STA_INFO_SIGNAL])));
+	json_object_object_add(station, "inactive", json_object_new_int(nla_get_u32(station_info[NL80211_STA_INFO_INACTIVE_TIME])));
+	json_object_object_add(station, "signal", json_object_new_int((int8_t)nla_get_u8(station_info[NL80211_STA_INFO_SIGNAL])));
 	json_object_object_add(station, "noise", json_object_new_int(data->noise));
+
+	json_object_object_add(station, "rx_bytes", json_object_new_int(nla_get_u32(station_info[NL80211_STA_INFO_RX_BYTES])));
+	json_object_object_add(station, "tx_bytes", json_object_new_int(nla_get_u32(station_info[NL80211_STA_INFO_TX_BYTES])));
+
+	json_object_object_add(station, "rx_packets", json_object_new_int(nla_get_u32(station_info[NL80211_STA_INFO_RX_PACKETS])));
+	json_object_object_add(station, "tx_packets", json_object_new_int(nla_get_u32(station_info[NL80211_STA_INFO_TX_PACKETS])));
+
+	/* Rate information */
+	json_object_object_add(station, "rx_rate", get_station_handler_parse_rate(station_info[NL80211_STA_INFO_RX_BITRATE]));
+	json_object_object_add(station, "tx_rate", get_station_handler_parse_rate(station_info[NL80211_STA_INFO_TX_BITRATE]));
 
 	json_object_object_add(data->stations, macbuf, station);
 
