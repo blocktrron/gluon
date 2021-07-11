@@ -429,28 +429,22 @@
 	}
 
 	function NeighbourDetails(iface) {
-		var iface_table_row = iface.table.insertRow();
-		var details_table = document.createElement('table');
+        var iface_table_row = iface.table.insertRow();
 
-		var dt_hdr = details_table.insertRow();
-		dt_hdr.insertCell(); /* Blank Cell */
-		dt_hdr.insertCell().textContent = "RX";
-		dt_hdr.insertCell().textContent = "TX";
+        var skel_table = document.getElementById("neighbour-detail-table-skel")
+        var details_block = skel_table.cloneNode(true)
+        details_block.id = null;
 
-		var dt_c_rate = details_table.insertRow();
-		dt_c_rate.insertCell().textContent = "Bitrate";
-		var dt_c_rate_rx = dt_c_rate.insertCell();
-		var dt_c_rate_tx = dt_c_rate.insertCell();
-
-        iface_table_row.appendChild(details_table);
+        iface_table_row.appendChild(details_block);
 
 		var properties = {
 			'wrapper_row': iface_table_row,
-			'rate': {'rx': dt_c_rate_rx, 'tx': dt_c_rate_tx},
+			'rate': {'rx': details_block.getElementsByClassName("column-bitrate-rx")[0], 'tx': details_block.getElementsByClassName("column-bitrate-tx")[0]},
 		};
 
         function rate_format(rate) {
-            return (rate/1000).toString.concat(",", (rate%1000).toString, " Mbit/s");
+            var rate_mbit = rate/1000;
+            return rate_mbit.toFixed(2).concat(" Mbit/s");
         }
 
 		var methods = {
