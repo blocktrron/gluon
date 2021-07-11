@@ -13,12 +13,11 @@
 #include <stdlib.h>
 
 #include <net/if.h>
+#include <linux/netlink.h>
 #include <linux/nl80211.h>
 #include <netlink/handlers.h>
 #include <netlink/genl/genl.h>
 #include <netlink/genl/ctrl.h>
-
-#include "netlink.h"
 
 struct nl_station_data {
 	int ifx;
@@ -26,7 +25,7 @@ struct nl_station_data {
 	struct json_object *stations;
 };
 
-static void nl_msg_parse(struct nl_msg *msg, struct nlattr **tb)
+static void gluonutil_nl_msg_parse(struct nl_msg *msg, struct nlattr **tb)
 {
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 
@@ -44,7 +43,7 @@ static int get_noise_handler(struct nl_msg *msg, void *arg)
 		[NL80211_SURVEY_INFO_NOISE]     = { .type = NLA_U8  },
 	};
 
-	nl_msg_parse(msg, tb);
+	gluonutil_nl_msg_parse(msg, tb);
 
 	if (!tb[NL80211_ATTR_SURVEY_INFO])
 		return NL_SKIP;
@@ -75,12 +74,12 @@ static int get_station_handler(struct nl_msg *msg, void *arg) {
 		[NL80211_STA_INFO_SIGNAL] = { .type = NLA_U8 },
 	};
 
-	char *nla_mac_ptr;
+	uint8_t *nla_mac_ptr;
 	char macbuf[18];
 
 	struct json_object *station;
 
-	nl_msg_parse(msg, tb);
+	gluonutil_nl_msg_parse(msg, tb);
 
 	if (!tb[NL80211_ATTR_STA_INFO]) {
 		return NL_SKIP;
@@ -95,7 +94,7 @@ static int get_station_handler(struct nl_msg *msg, void *arg) {
 	station = json_object_new_object();
 
 	nla_mac_ptr = nla_data(tb[NL80211_ATTR_MAC]);
-	snprintf(macbuf, "%02x:%02x:%02x:%02x:%02x:%02x",
+	sprintf(macbuf, "%02x:%02x:%02x:%02x:%02x:%02x",
 		 nla_mac_ptr[0], nla_mac_ptr[1], nla_mac_ptr[2],
 		 nla_mac_ptr[3], nla_mac_ptr[4], nla_mac_ptr[5]);
 
@@ -177,11 +176,10 @@ struct json_object *gluonutil_get_stations(const char *ifname) {
 	if (!data.ifx)
 		return NULL;
 
-	data.stations = stations = json_object_new_object();
+	data.stations = json_object_new_object();
 
-	nl_send_dump(get_station_handler, &data, NL80211_CMD_GET_SURVEY, data.ifx);
+	nl_send_dump(get_noise_handler, &data, NL80211_CMD_GET_SURVEY, data.ifx);
 	nl_send_dump(get_station_handler, &data, NL80211_CMD_GET_STATION, data.ifx);
-	/* Old */
 
 	return data.stations;
 }

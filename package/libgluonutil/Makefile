@@ -16,6 +16,8 @@ define Package/libgluonutil
   DEPENDS:=+libjson-c +libuci +libnl-tiny
 endef
 
+TARGET_CFLAGS += -I$(STAGING_DIR)/usr/include/libnl-tiny
+
 define Package/libgluonutil/install
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/libgluonutil.so $(1)/usr/lib/
