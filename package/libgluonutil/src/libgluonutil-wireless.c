@@ -79,7 +79,7 @@ static json_object *get_station_handler_parse_rate(struct nlattr *bitrate_attr) 
 		return NULL;
 
 	rate_obj = json_object_new_object();
-	json_object_object_add(rate_obj, "rate", json_object_new_int(nla_get_u32(rate_info[NL80211_RATE_INFO_BITRATE32]) * 10));
+	json_object_object_add(rate_obj, "rate", json_object_new_int(nla_get_u32(rate_info[NL80211_RATE_INFO_BITRATE32]) * 100));
 
 	return rate_obj;
 }

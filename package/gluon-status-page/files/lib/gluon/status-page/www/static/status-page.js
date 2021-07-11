@@ -430,7 +430,7 @@
 
 	function NeighbourDetails(iface) {
 		var iface_table_row = iface.table.insertRow();
-		var details_table = iface_table_row.createElement('table');
+		var details_table = document.createElement('table');
 
 		var dt_hdr = details_table.insertRow();
 		dt_hdr.insertCell(); /* Blank Cell */
@@ -438,22 +438,28 @@
 		dt_hdr.insertCell().textContent = "TX";
 
 		var dt_c_rate = details_table.insertRow();
-		dt_c_rate.insertCell("Bitrate");
+		dt_c_rate.insertCell().textContent = "Bitrate";
 		var dt_c_rate_rx = dt_c_rate.insertCell();
 		var dt_c_rate_tx = dt_c_rate.insertCell();
+
+        iface_table_row.appendChild(details_table);
 
 		var properties = {
 			'wrapper_row': iface_table_row,
 			'rate': {'rx': dt_c_rate_rx, 'tx': dt_c_rate_tx},
 		};
 
+        function rate_format(rate) {
+            return (rate/1000).toString.concat(",", (rate%1000).toString, " Mbit/s");
+        }
+
 		var methods = {
 			'set_visibility': function(state) {
 				console.log(state);
 			},
 			'update_data': function(data) {
-				properties.rate.rx.textContent = data.rx_rate.rate;
-				properties.rate.tx.textContent = data.tx_rate.rate;
+				properties.rate.rx.textContent = rate_format(data.rx_rate.rate);
+				properties.rate.tx.textContent = rate_format(data.tx_rate.rate);
 				console.log(data);
 			},
 			'destroy': function() {
