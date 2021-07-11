@@ -1,1 +1,841 @@
-"use strict";!function(){var a=JSON.parse(document.body.getAttribute("data-translations"));function i(t,e){return t.toFixed(e).replace(/\./,a["."])}function o(t,e){e--;for(var n=t;10<=n&&0<e;n/=10)e--;return i(t,e)}function r(t){return function(t,e,n){var r=0;if(void 0===n)return"- ";for(;e<n&&r<t.length-1;)n/=e,r++;return(n=o(n,3))+" "+t[r]}(["","K","M","G","T"],1024,t)}String.prototype.sprintf=function(){var t=0,e=arguments;return this.replace(/%s/g,function(){return e[t++]})};var u={id:function(t){return t},decimal:function(t){return i(t,2)},percent:function(t){return a["%s used"].sprintf(o(100*t,3)+"%")},memory:function(t){var e=1-t.available/t.total;return u.percent(e)},time:function(t){var e=Math.round(t/60),n=Math.floor(e/1440),r=Math.floor(e%1440/60);e=Math.floor(e%60);var i="";return 1===n?i+=a["1 day"]+", ":1<n&&(i+=a["%s days"].sprintf(n)+", "),i+=r+":",e<10&&(i+="0"),i+=e},packetsDiff:function(t,e,n){if(0<n)return r=(t-e)/n,a["%s packets/s"].sprintf(i(r,0));var r},bytesDiff:function(t,e,n){if(0<n)return r(8*((t-e)/n))+"bps"},bytes:function(t){return r(t)+"B"},neighbour:function(t){if(!t)return"";for(var e in c){var n=c[e].lookup_neigh(t);if(n)return"via "+n.get_hostname()+" ("+e+")"}return"via "+t+" (unknown iface)"}};function l(e,t){return t.split("/").forEach(function(t){e=e&&e[t]}),e}function h(t,n){var e=new EventSource(t),r={};e.onmessage=function(t){var e=JSON.parse(t.data);n(e,r),r=e},e.onerror=function(){e.close(),window.setTimeout(function(){h(t,n)},3e3)}}var y,w=document.body.getAttribute("data-node-address");try{y=JSON.parse(document.body.getAttribute("data-node-location"))}catch(t){}function t(t){var e=document.getElementById("mesh-vpn");if(t){e.style.display="";for(var i=document.getElementById("mesh-vpn-peers");i.lastChild;)i.removeChild(i.lastChild);var n=function e(n,r){return Object.keys(r.peers||{}).forEach(function(t){n.push([t,r.peers[t]])}),Object.keys(r.groups||{}).forEach(function(t){e(n,r.groups[t])}),n}([],t);n.sort(),n.forEach(function(t){var e=document.createElement("tr"),n=document.createElement("th");n.textContent=t[0],e.appendChild(n);var r=document.createElement("td");t[1]?r.textContent=a.connected+" ("+u.time(t[1].established)+")":r.textContent=a["not connected"],e.appendChild(r),i.appendChild(e)})}else e.style.display="none"}var e=document.querySelectorAll("[data-statistics]");h("/cgi-bin/dyn/statistics",function(o,c){var s=o.uptime-c.uptime;e.forEach(function(t){var e=t.getAttribute("data-statistics"),n=t.getAttribute("data-format"),r=l(c,e),i=l(o,e);try{var a=u[n](i,r,s);void 0!==a&&(t.textContent=a)}catch(t){console.error(t)}});try{t(o.mesh_vpn)}catch(t){console.error(t)}});var c={};function E(a){var o=document.createElement("canvas"),c=o.getContext("2d"),s=null;return{canvas:o,highlight:!1,resize:function(t,e){try{c.getImageData(0,0,t,e)}catch(t){}o.width=t,o.height=e},draw:function(t,e){var n,r,i=e(s);c.clearRect(t,0,5,o.height),i&&(n=t,r=i,c.beginPath(),c.fillStyle=a,c.arc(n,r,1.2,0,2*Math.PI,!1),c.closePath(),c.fill())},set:function(t){s=t}}}function f(){var s=-100,u=0,n=0,r=[],l=document.createElement("canvas");l.className="signalgraph",l.height=200;var h=l.getContext("2d");function t(){l.width=l.clientWidth,r.forEach(function(t){t.resize(l.width,l.height)})}function i(){if(0!==l.clientWidth){l.width!==l.clientWidth&&t(),h.clearRect(0,0,l.width,l.height);var e=!1;r.forEach(function(t){t.highlight&&(e=!0)}),h.save(),r.forEach(function(t){e&&(h.globalAlpha=.2),t.highlight&&(h.globalAlpha=1),t.draw(n,function(t){return e=t,n=s,r=u,i=l.height,(1-(e-n)/(r-n))*i;var e,n,r,i}),h.drawImage(t.canvas,0,0)}),h.restore(),h.save(),h.beginPath(),h.strokeStyle="rgba(255, 180, 0, 0.15)",h.lineWidth=5,h.moveTo(n+2.5,0),h.lineTo(n+2.5,l.height),h.stroke(),function(){var t,e,n,r,i=Math.floor(l.height/40);h.save(),h.lineWidth=.5,h.strokeStyle="rgba(0, 0, 0, 0.25)",h.fillStyle="rgba(0, 0, 0, 0.5)",h.textAlign="end",h.textBaseline="bottom",h.beginPath();for(var a=0;a<i;a++){var o=l.height-40*a;h.moveTo(0,o-.5),h.lineTo(l.width,o-.5);var c=Math.round((t=o,e=s,n=u,r=l.height,(e*t+n*(r-t))/r))+" dBm";h.save(),h.strokeStyle="rgba(255, 255, 255, 0.9)",h.lineWidth=4,h.miterLimit=2,h.strokeText(c,l.width-5,o-2.5),h.fillText(c,l.width-5,o-2.5),h.restore()}h.stroke(),h.strokeStyle="rgba(0, 0, 0, 0.83)",h.lineWidth=1.5,h.strokeRect(.5,.5,l.width-1,l.height-1),h.restore()}()}}t(),window.addEventListener("resize",i);var a=0;return window.requestAnimationFrame(function t(e){40<e-a&&(i(),n=(n+1)%l.width,a=e),window.requestAnimationFrame(t)}),{el:l,addSignal:function(t){r.push(t),t.resize(l.width,l.height)},removeSignal:function(t){r.splice(r.indexOf(t),1)}}}function d(t,e,n,r){var i=t.table.firstElementChild,a=t.table.insertRow(),o=a.insertCell();if(o.setAttribute("data-label",i.children[0].textContent),t.wireless){var c=document.createElement("span");c.textContent="⬤ ",c.style.color=n,o.appendChild(c)}var f=document.createElement("span");f.textContent=e,o.appendChild(f);var s,d,u,l,h,g={};function v(t){var e=t.getAttribute("data-key");if(e){var n=t.getAttribute("data-suffix")||"",r=a.insertCell();r.textContent="-",r.setAttribute("data-label",t.textContent),g[e]={td:r,suffix:n}}}for(var m=0;m<i.children.length;m++)v(i.children[m]);function p(){h&&window.clearTimeout(h),h=window.setTimeout(function(){l&&t.signalgraph.removeSignal(l),a.parentNode.removeChild(a),r()},6e4)}function b(t){var e=function(t){"::"==t.slice(0,2)&&(t="0"+t),"::"==t.slice(-2)&&(t+="0");var e=t.split(":"),n=e.length,r=[];return e.forEach(function(t,e){if(""===t)for(;n++<=8;)r.push(0);else{if(!/^[a-f0-9]{1,4}$/i.test(t))return;r.push(parseInt(t,16))}}),r}(t);if(e){var n="";return e.forEach(function(t){n+=("0000000000000000"+t.toString(2)).slice(-16)}),n}}function C(t){var r=b(w);if(t&&t[0]){(t=t.map(function(t){var e=b(t);if(!e)return[-1];var n=0;return r&&(n=function(t,e){var n;for(n=0;n<t.length&&n<e.length&&t[n]===e[n];n++);return n}(r,e)),[n,e,t]})).sort(function(t,e){return t[0]<e[0]?1:t[0]>e[0]||t[1]<e[1]?-1:t[1]>e[1]?1:0});var e=t[0][2];return e&&!/^fe80:/i.test(e)?e:void 0}}return t.wireless&&((s=a.insertCell()).textContent="-",s.setAttribute("data-label",i.children[Object.keys(g).length+1].textContent),(d=a.insertCell()).textContent="-",d.setAttribute("data-label",i.children[Object.keys(g).length+2].textContent),(u=a.insertCell()).textContent="-",u.setAttribute("data-label",i.children[Object.keys(g).length+3].textContent),l=E(n),t.signalgraph.addSignal(l)),a.onmouseenter=function(){a.classList.add("highlight"),l&&(l.highlight=!0)},a.onmouseleave=function(){a.classList.remove("highlight"),l&&(l.highlight=!1)},p(),{get_hostname:function(){return f.textContent},update_nodeinfo:function(t){var e,n,r,i,a,o,c,s,u=C(t.network.addresses);if(u){if("span"===f.nodeName.toLowerCase()){var l=f;f=document.createElement("a"),l.parentNode.replaceChild(f,l)}f.href="http://["+u+"]/"}if(f.textContent=t.hostname,y&&t.location){var h=(e=y.latitude,n=y.longitude,r=t.location.latitude,i=t.location.longitude,a=Math.PI/180,o=(r*=a)-(e*=a),c=(i*=a)-(n*=a),s=Math.sin(o/2)*Math.sin(o/2)+Math.sin(c/2)*Math.sin(c/2)*Math.cos(e)*Math.cos(r),2*Math.asin(Math.sqrt(s))*6372.8);d.textContent=Math.round(1e3*h)+" m"}p()},update_mesh:function(n){Object.keys(g).forEach(function(t){var e=g[t];e.td.textContent=n[t]+e.suffix}),p()},update_wifi:function(t){s.textContent=t.signal,u.textContent=Math.round(t.inactive/1e3)+" s",a.classList.toggle("inactive",200<t.inactive),l.set(200<t.inactive?null:t.signal),p()}}}function s(t,e,n){var r,a={};n&&(r=f(),t.appendChild(r.el));var i={table:t.firstElementChild,signalgraph:r,ifname:e,wireless:n},o=!1,c={},s=[];function u(){if(!o){o=!0;var t=new EventSource("/cgi-bin/dyn/neighbours-nodeinfo?"+encodeURIComponent(e));t.addEventListener("neighbour",function(t){try{var n=JSON.parse(t.data);r=[],i=n.network.mesh,Object.keys(i).forEach(function(t){var e=i[t].interfaces;Object.keys(e).forEach(function(t){e[t].forEach(function(t){r.push(t)})})}),r.forEach(function(t){var e=a[t];if(e){delete c[t];try{e.update_nodeinfo(n)}catch(t){console.error(t)}}})}catch(t){console.error(t)}var r,i},!1),t.onerror=function(){t.close(),o=!1,Object.keys(c).forEach(function(t){0<c[t]&&(c[t]--,u())})}}}function l(t){var e=a[t];return e||(c[t]=3,e=a[t]=d(i,t,(s[0]||(s=["#396AB1","#DA7C30","#3E9651","#CC2529","#535154","#6B4C9A","#922428","#948B3D"]),s.shift()),function(){delete c[t],delete a[t]}),u()),e}return n&&h("/cgi-bin/dyn/stations?"+encodeURIComponent(e),function(n){Object.keys(n).forEach(function(t){var e=n[t];l(t).update_wifi(e)})}),{get_neigh:l,lookup_neigh:function(t){return a[t]}}}document.querySelectorAll("[data-interface]").forEach(function(t){var e=t.getAttribute("data-interface"),n=(t.getAttribute("data-interface-address"),!!t.getAttribute("data-interface-wireless"));c[e]=s(t,e,n)});var n=document.body.getAttribute("data-mesh-provider");n&&h(n,function(r){Object.keys(r).forEach(function(t){var e=r[t],n=c[e.ifname];n&&n.get_neigh(t).update_mesh(e)})})}();
+/*
+	Build using:
+
+	uglifyjs javascript/status-page.js -o files/lib/gluon/status-page/www/static/status-page.js -c -m
+*/
+
+'use strict';
+
+(function() {
+	var _ = JSON.parse(document.body.getAttribute('data-translations'));
+
+	String.prototype.sprintf = function() {
+		var i = 0;
+		var args = arguments;
+
+		return this.replace(/%s/g, function() {
+			return args[i++];
+		});
+	};
+
+	function formatNumberFixed(d, digits) {
+		return d.toFixed(digits).replace(/\./, _['.'])
+	}
+
+	function formatNumber(d, digits) {
+		digits--;
+
+		for (var v = d; v >= 10 && digits > 0; v /= 10)
+			digits--;
+
+		// avoid toPrecision as it might produce strings in exponential notation
+		return formatNumberFixed(d, digits);
+	}
+
+	function prettyPackets(d) {
+		return _['%s packets/s'].sprintf(formatNumberFixed(d, 0));
+	}
+
+	function prettyPrefix(prefixes, step, d) {
+		var prefix = 0;
+
+		if (d === undefined)
+			return "- ";
+
+		while (d > step && prefix < prefixes.length - 1) {
+			d /= step;
+			prefix++;
+		}
+
+		d = formatNumber(d, 3);
+		return d + " " + prefixes[prefix];
+	}
+
+	function prettySize(d) {
+		return prettyPrefix([ "", "K", "M", "G", "T" ], 1024, d);
+	}
+
+	function prettyBits(d) {
+		return prettySize(8 * d) + "bps";
+	}
+
+	function prettyBytes(d) {
+		return prettySize(d) + "B";
+	}
+
+	var formats = {
+		'id': function(value) {
+			return value;
+		},
+		'decimal': function(value) {
+			return formatNumberFixed(value, 2);
+		},
+		'percent': function(value) {
+			return _['%s used'].sprintf(formatNumber(100 * value, 3) + '%');
+		},
+		'memory': function(memory) {
+			var usage = 1 - memory.available / memory.total
+			return formats.percent(usage);
+		},
+		'time': function(seconds) {
+			var minutes = Math.round(seconds / 60);
+
+			var days = Math.floor(minutes / 1440);
+			var hours = Math.floor((minutes % 1440) / 60);
+			minutes = Math.floor(minutes % 60);
+
+			var out = '';
+
+			if (days === 1)
+				out += _['1 day'] + ', ';
+			else if (days > 1)
+				out += _['%s days'].sprintf(days) + ", ";
+
+			out += hours + ":";
+
+			if (minutes < 10)
+				out += "0";
+
+			out += minutes;
+
+			return out;
+		},
+		'packetsDiff': function(packets, packetsPrev, diff) {
+			if (diff > 0)
+				return prettyPackets((packets-packetsPrev) / diff);
+
+		},
+		'bytesDiff': function(bytes, bytesPrev, diff) {
+			if (diff > 0)
+				return prettyBits((bytes-bytesPrev) / diff);
+		},
+		'bytes': function(bytes) {
+			return prettyBytes(bytes);
+		},
+		'neighbour': function(addr) {
+			if (!addr)
+				return '';
+
+			for (var i in interfaces) {
+				var iface = interfaces[i];
+				var neigh = iface.lookup_neigh(addr);
+				if (!neigh)
+					continue;
+				return 'via ' + neigh.get_hostname() + ' (' + i + ')';
+			}
+
+			return 'via ' + addr + ' (unknown iface)';
+		}
+	}
+
+
+	function resolve_key(obj, key) {
+		key.split('/').forEach(function(part) {
+			if (obj)
+				obj = obj[part];
+		});
+
+		return obj;
+	}
+
+	function add_event_source(url, handler) {
+		var source = new EventSource(url);
+		var prev = {};
+		source.onmessage = function(m) {
+			var data = JSON.parse(m.data);
+			handler(data, prev);
+			prev = data;
+		}
+		source.onerror = function() {
+			source.close();
+			window.setTimeout(function() {
+				add_event_source(url, handler);
+			}, 3000);
+		}
+	}
+
+	var node_address = document.body.getAttribute('data-node-address');
+
+	var location;
+	try {
+		location = JSON.parse(document.body.getAttribute('data-node-location'));
+	} catch (e) {
+	}
+
+
+	function update_mesh_vpn(data) {
+		function add_group(peers, d) {
+			Object.keys(d.peers || {}).forEach(function(peer) {
+				peers.push([peer, d.peers[peer]]);
+			});
+
+			Object.keys(d.groups || {}).forEach(function(group) {
+				add_group(peers, d.groups[group]);
+			});
+
+			return peers;
+		}
+
+		var div = document.getElementById('mesh-vpn');
+		if (!data) {
+			div.style.display = 'none';
+			return;
+		}
+
+		div.style.display = '';
+		var table = document.getElementById('mesh-vpn-peers');
+		while (table.lastChild)
+			table.removeChild(table.lastChild);
+
+		var peers = add_group([], data);
+		peers.sort();
+
+		peers.forEach(function (peer) {
+			var tr = document.createElement('tr');
+
+			var th = document.createElement('th');
+			th.textContent = peer[0];
+			tr.appendChild(th);
+
+			var td = document.createElement('td');
+			if (peer[1])
+				td.textContent = _['connected'] + ' (' + formats.time(peer[1].established) + ')';
+			else
+				td.textContent = _['not connected'];
+			tr.appendChild(td);
+
+			table.appendChild(tr);
+		});
+	}
+
+	var statisticsElems = document.querySelectorAll('[data-statistics]');
+
+	add_event_source('/cgi-bin/dyn/statistics', function(data, dataPrev) {
+		var diff = data.uptime - dataPrev.uptime;
+
+		statisticsElems.forEach(function(elem) {
+			var stat = elem.getAttribute('data-statistics');
+			var format = elem.getAttribute('data-format');
+
+			var valuePrev = resolve_key(dataPrev, stat);
+			var value = resolve_key(data, stat);
+			try {
+				var text = formats[format](value, valuePrev, diff);
+				if (text !== undefined)
+					elem.textContent = text;
+			} catch (e) {
+				console.error(e);
+			}
+		});
+
+		try {
+			update_mesh_vpn(data.mesh_vpn);
+		} catch (e) {
+			console.error(e);
+		}
+	})
+
+	function haversine(lat1, lon1, lat2, lon2) {
+		var rad = Math.PI / 180;
+		lat1 *= rad; lon1 *= rad; lat2 *= rad; lon2 *= rad;
+
+		var R = 6372.8; // km
+		var dLat = lat2 - lat1;
+		var dLon = lon2 - lon1;
+		var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+		var c = 2 * Math.asin(Math.sqrt(a));
+		return R * c;
+	}
+
+	var interfaces = {};
+
+	function Signal(color) {
+		var canvas = document.createElement('canvas');
+		var ctx = canvas.getContext('2d');
+		var value = null;
+		var radius = 1.2;
+
+		function drawPixel(x, y) {
+			ctx.beginPath();
+			ctx.fillStyle = color;
+			ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+			ctx.closePath();
+			ctx.fill();
+		}
+
+		return {
+			'canvas': canvas,
+			'highlight': false,
+
+			'resize': function(w, h) {
+				var lastImage;
+				try {
+					ctx.getImageData(0, 0, w, h);
+				} catch (e) {}
+				canvas.width = w;
+				canvas.height = h;
+				if (lastImage)
+					ctx.putImageData(lastImage, 0, 0);
+			},
+
+			'draw': function(x, scale) {
+				var y = scale(value);
+
+				ctx.clearRect(x, 0, 5, canvas.height)
+
+				if (y)
+					drawPixel(x, y)
+			},
+
+			'set': function (d) {
+				value = d;
+			},
+		};
+	}
+
+	function SignalGraph() {
+		var min = -100, max = 0;
+		var i = 0;
+
+		var signals = [];
+
+		var canvas = document.createElement('canvas');
+		canvas.className = 'signalgraph';
+		canvas.height = 200;
+
+		var ctx = canvas.getContext('2d');
+
+		function scaleInverse(n, min, max, height) {
+			return (min * n + max * (height - n)) / height;
+		}
+
+		function scale(n, min, max, height) {
+			return (1 - (n - min) / (max - min)) * height;
+		}
+
+		function drawGrid() {
+			var nLines = Math.floor(canvas.height / 40);
+			ctx.save();
+			ctx.lineWidth = 0.5;
+			ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+			ctx.textAlign = 'end';
+			ctx.textBaseline = 'bottom';
+
+			ctx.beginPath();
+
+			for (var i = 0; i < nLines; i++) {
+				var y = canvas.height - i * 40;
+				ctx.moveTo(0, y - 0.5);
+				ctx.lineTo(canvas.width, y - 0.5);
+				var dBm = Math.round(scaleInverse(y, min, max, canvas.height)) + ' dBm';
+
+				ctx.save();
+				ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+				ctx.lineWidth = 4;
+				ctx.miterLimit = 2;
+				ctx.strokeText(dBm, canvas.width - 5, y - 2.5);
+				ctx.fillText(dBm, canvas.width - 5, y - 2.5);
+				ctx.restore();
+			}
+
+			ctx.stroke();
+
+			ctx.strokeStyle = 'rgba(0, 0, 0, 0.83)';
+			ctx.lineWidth = 1.5;
+			ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+
+			ctx.restore();
+		}
+
+		function resize() {
+			canvas.width = canvas.clientWidth;
+			signals.forEach(function(signal) {
+				signal.resize(canvas.width, canvas.height);
+			});
+		}
+		resize();
+
+		function draw() {
+			if (canvas.clientWidth === 0)
+				return;
+
+			if (canvas.width !== canvas.clientWidth)
+				resize();
+
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+			var highlight = false;
+			signals.forEach(function(signal) {
+				if (signal.highlight)
+					highlight = true;
+			});
+
+			ctx.save();
+			signals.forEach(function(signal) {
+				if (highlight)
+					ctx.globalAlpha = 0.2;
+
+				if (signal.highlight)
+					ctx.globalAlpha = 1;
+
+				signal.draw(i, function(value) {
+					return scale(value, min, max, canvas.height);
+				});
+				ctx.drawImage(signal.canvas, 0, 0);
+			});
+			ctx.restore();
+
+			ctx.save();
+			ctx.beginPath();
+			ctx.strokeStyle = 'rgba(255, 180, 0, 0.15)';
+			ctx.lineWidth = 5;
+			ctx.moveTo(i + 2.5, 0);
+			ctx.lineTo(i + 2.5, canvas.height);
+			ctx.stroke();
+
+			drawGrid();
+		}
+
+		window.addEventListener('resize', draw);
+
+		var last = 0;
+		function step(timestamp) {
+			var delta = timestamp - last;
+
+			if (delta > 40) {
+				draw();
+				i = (i + 1) % canvas.width;
+				last = timestamp;
+			};
+
+			window.requestAnimationFrame(step);
+		}
+
+		window.requestAnimationFrame(step);
+
+		return {
+			'el': canvas,
+
+			'addSignal': function(signal) {
+				signals.push(signal);
+				signal.resize(canvas.width, canvas.height);
+			},
+
+			'removeSignal': function(signal) {
+				signals.splice(signals.indexOf(signal), 1);
+			},
+		};
+	}
+
+	function NeighbourDetails(iface) {
+		var iface_table_row = iface.table.insertRow();
+		var details_table = iface_table_row.createElement('table');
+
+		var dt_hdr = details_table.insertRow();
+		dt_hdr.insertCell(); /* Blank Cell */
+		dt_hdr.insertCell().textContent = "RX";
+		dt_hdr.insertCell().textContent = "TX";
+
+		var dt_c_rate = details_table.insertRow();
+		dt_c_rate.insertCell("Bitrate");
+		var dt_c_rate_rx = dt_c_rate.insertCell();
+		var dt_c_rate_tx = dt_c_rate.insertCell();
+
+		var properties = {
+			'wrapper_row': iface_table_row,
+			'rate': {'rx': dt_c_rate_rx, 'tx': dt_c_rate_tx},
+		};
+
+		var methods = {
+			'set_visibility': function(state) {
+				console.log(state);
+			},
+			'update_data': function(data) {
+				properties.rate.rx.textContent = data.rx_rate.rate;
+				properties.rate.tx.textContent = data.tx_rate.rate;
+				console.log(data);
+			},
+			'destroy': function() {
+				iface_table_row.parentNode.removeChild(iface_table_row);
+			}
+		}
+		return methods;
+	}
+
+	function Neighbour(iface, addr, color, destroy) {
+		var th = iface.table.firstElementChild;
+		var el = iface.table.insertRow();
+		var details = NeighbourDetails(iface);
+
+		var tdHostname = el.insertCell();
+		tdHostname.setAttribute('data-label', th.children[0].textContent);
+
+		if (iface.wireless) {
+			var marker = document.createElement("span");
+			marker.textContent = "⬤ ";
+			marker.style.color = color;
+			tdHostname.appendChild(marker);
+		}
+
+		var hostname = document.createElement("span");
+		hostname.textContent = addr;
+		tdHostname.appendChild(hostname);
+
+		var meshAttrs = {};
+
+		function add_attr(attr) {
+			var key = attr.getAttribute('data-key');
+			if (!key)
+				return;
+
+			var suffix = attr.getAttribute('data-suffix') || '';
+
+			var td = el.insertCell();
+			td.textContent = '-';
+			td.setAttribute('data-label', attr.textContent);
+
+			meshAttrs[key] = {
+				'td': td,
+				'suffix': suffix,
+			};
+		}
+
+		for (var i = 0; i < th.children.length; i++)
+			add_attr(th.children[i]);
+
+		var tdSignal;
+		var tdDistance;
+		var tdInactive;
+		var signal;
+
+		if (iface.wireless) {
+			tdSignal = el.insertCell();
+			tdSignal.textContent = '-';
+			tdSignal.setAttribute(
+				'data-label',
+				th.children[Object.keys(meshAttrs).length + 1].textContent
+			);
+
+			tdDistance = el.insertCell();
+			tdDistance.textContent = '-';
+			tdDistance.setAttribute(
+				'data-label',
+				th.children[Object.keys(meshAttrs).length + 2].textContent
+			);
+
+			tdInactive = el.insertCell();
+			tdInactive.textContent = '-';
+			tdInactive.setAttribute(
+				'data-label',
+				th.children[Object.keys(meshAttrs).length + 3].textContent
+			);
+
+			signal = Signal(color);
+			iface.signalgraph.addSignal(signal);
+		}
+
+		el.onmouseenter = function () {
+			el.classList.add("highlight");
+			if (signal)
+				signal.highlight = true;
+		}
+
+		el.onmouseleave = function () {
+			el.classList.remove("highlight")
+			if (signal)
+				signal.highlight = false;
+		}
+
+		var timeout;
+
+		function updated() {
+			if (timeout)
+				window.clearTimeout(timeout);
+
+			timeout = window.setTimeout(function() {
+				if (signal)
+					iface.signalgraph.removeSignal(signal);
+
+				el.parentNode.removeChild(el);
+				details.destroy();
+				destroy();
+			}, 60000);
+		}
+		updated();
+
+		function address_to_groups(addr) {
+			if (addr.slice(0, 2) == '::')
+				addr = '0' + addr;
+			if (addr.slice(-2) == '::')
+				addr = addr + '0';
+
+			var parts = addr.split(':');
+			var n = parts.length;
+			var groups = [];
+
+			parts.forEach(function(part, i) {
+				if (part === '') {
+					while (n++ <= 8)
+						groups.push(0);
+				} else {
+					if (!/^[a-f0-9]{1,4}$/i.test(part))
+						return;
+
+					groups.push(parseInt(part, 16));
+				}
+			});
+
+			return groups;
+		}
+
+		function address_to_binary(addr) {
+			var groups = address_to_groups(addr);
+			if (!groups)
+				return;
+
+			var ret = '';
+			groups.forEach(function(group) {
+				ret += ('0000000000000000' + group.toString(2)).slice(-16);
+			});
+
+			return ret;
+		}
+
+		function common_length(a, b) {
+			var i;
+			for (i = 0; i < a.length && i < b.length; i++) {
+				if (a[i] !== b[i])
+				break;
+			}
+			return i;
+		}
+
+		function choose_address(addresses) {
+			var node_bin = address_to_binary(node_address);
+
+			if (!addresses || !addresses[0])
+				return;
+
+			addresses = addresses.map(function(addr) {
+				var addr_bin = address_to_binary(addr);
+				if (!addr_bin)
+					return [-1];
+
+				var common_prefix = 0;
+				if (node_bin)
+					common_prefix = common_length(node_bin, addr_bin);
+
+				return [common_prefix, addr_bin, addr];
+			});
+
+			addresses.sort(function(a, b) {
+				if (a[0] < b[0])
+					return 1;
+				else if (a[0] > b[0])
+					return -1;
+				else if (a[1] < b[1])
+					return -1;
+				else if (a[1] > b[1])
+					return 1;
+				else
+					return 0;
+
+			});
+
+			var address = addresses[0][2];
+			if (address && !/^fe80:/i.test(address))
+				return address;
+		}
+
+		return {
+			'get_hostname': function() {
+				return hostname.textContent;
+			},
+			'update_nodeinfo': function(nodeinfo) {
+				var addr = choose_address(nodeinfo.network.addresses);
+				if (addr) {
+					if (hostname.nodeName.toLowerCase() === 'span') {
+						var oldHostname = hostname;
+						hostname = document.createElement('a');
+						oldHostname.parentNode.replaceChild(hostname, oldHostname);
+					}
+
+					hostname.href = 'http://[' + addr + ']/';
+				}
+
+				hostname.textContent = nodeinfo.hostname;
+
+				if (location && nodeinfo.location) {
+					var distance = haversine(
+						location.latitude, location.longitude,
+						nodeinfo.location.latitude, nodeinfo.location.longitude
+					);
+					tdDistance.textContent = Math.round(distance * 1000) + " m"
+				}
+
+				updated();
+			},
+			'update_mesh': function(mesh) {
+				Object.keys(meshAttrs).forEach(function(key) {
+					var attr = meshAttrs[key];
+					attr.td.textContent = mesh[key] + attr.suffix;
+				});
+
+				updated();
+			},
+			'update_wifi': function(wifi) {
+				var inactiveLimit = 200;
+
+				tdSignal.textContent = wifi.signal;
+			        tdInactive.textContent = Math.round(wifi.inactive / 1000) + ' s';
+
+			        el.classList.toggle('inactive', wifi.inactive > inactiveLimit);
+				signal.set(wifi.inactive > inactiveLimit ? null : wifi.signal);
+
+				details.update_data(wifi);
+
+				updated();
+			},
+		};
+	}
+
+	function Interface(el, ifname, wireless) {
+
+		var neighs = {};
+
+		var signalgraph;
+		if (wireless) {
+			signalgraph = SignalGraph();
+			el.appendChild(signalgraph.el);
+		}
+
+		var info = {
+			'table': el.firstElementChild,
+			'signalgraph': signalgraph,
+			'ifname': ifname,
+			'wireless': wireless,
+		};
+
+		var nodeinfo_running = false;
+		var want_nodeinfo = {};
+
+		var graphColors = [];
+		function get_color() {
+			if (!graphColors[0])
+				graphColors = ["#396AB1", "#DA7C30", "#3E9651", "#CC2529", "#535154", "#6B4C9A", "#922428", "#948B3D"];
+
+			return graphColors.shift();
+		}
+
+		function neigh_addresses(nodeinfo) {
+			var addrs = [];
+
+			var mesh = nodeinfo.network.mesh;
+			Object.keys(mesh).forEach(function(meshif) {
+				var ifaces = mesh[meshif].interfaces;
+				Object.keys(ifaces).forEach(function(ifaceType) {
+					ifaces[ifaceType].forEach(function(addr) {
+						addrs.push(addr);
+					});
+				});
+			});
+
+			return addrs;
+		}
+
+		function load_nodeinfo() {
+			if (nodeinfo_running)
+				return;
+
+			nodeinfo_running = true;
+
+			var source = new EventSource('/cgi-bin/dyn/neighbours-nodeinfo?' + encodeURIComponent(ifname));
+			source.addEventListener("neighbour", function(m) {
+				try {
+					var data = JSON.parse(m.data);
+					neigh_addresses(data).forEach(function(addr) {
+						var neigh = neighs[addr];
+						if (neigh) {
+							delete want_nodeinfo[addr];
+							try {
+								neigh.update_nodeinfo(data);
+							} catch (e) {
+								console.error(e);
+							}
+						}
+					});
+				} catch (e) {
+					console.error(e);
+				}
+			}, false);
+
+			source.onerror = function() {
+				source.close();
+				nodeinfo_running = false;
+
+				Object.keys(want_nodeinfo).forEach(function (addr) {
+					if (want_nodeinfo[addr] > 0) {
+						want_nodeinfo[addr]--;
+						load_nodeinfo();
+					}
+				});
+			}
+		}
+
+		function lookup_neigh(addr) {
+			return neighs[addr];
+		}
+
+		function get_neigh(addr) {
+			var neigh = neighs[addr];
+			if (!neigh) {
+				want_nodeinfo[addr] = 3;
+				neigh = neighs[addr] = Neighbour(info, addr, get_color(), function() {
+					delete want_nodeinfo[addr];
+					delete neighs[addr];
+				});
+				load_nodeinfo();
+			}
+
+			return neigh;
+		}
+
+		if (wireless) {
+			add_event_source('/cgi-bin/dyn/stations?' + encodeURIComponent(ifname), function(data) {
+				Object.keys(data).forEach(function (addr) {
+					var wifi = data[addr];
+
+					get_neigh(addr).update_wifi(wifi);
+				});
+			});
+		}
+
+		return {
+			'get_neigh': get_neigh,
+			'lookup_neigh': lookup_neigh
+		};
+	}
+
+	document.querySelectorAll('[data-interface]').forEach(function(elem) {
+		var ifname = elem.getAttribute('data-interface');
+		var address = elem.getAttribute('data-interface-address');
+		var wireless = !!elem.getAttribute('data-interface-wireless');
+
+		interfaces[ifname] = Interface(elem, ifname, wireless);
+	});
+
+	var mesh_provider = document.body.getAttribute('data-mesh-provider');
+	if (mesh_provider) {
+		add_event_source(mesh_provider, function(data) {
+			Object.keys(data).forEach(function (addr) {
+				var mesh = data[addr];
+				var iface = interfaces[mesh.ifname];
+				if (!iface)
+					return;
+
+				iface.get_neigh(addr).update_mesh(mesh);
+			});
+		});
+	}
+})();

@@ -428,9 +428,45 @@
 		};
 	}
 
+	function NeighbourDetails(iface) {
+		var iface_table_row = iface.table.insertRow();
+		var details_table = iface_table_row.createElement('table');
+
+		var dt_hdr = details_table.insertRow();
+		dt_hdr.insertCell(); /* Blank Cell */
+		dt_hdr.insertCell().textContent = "RX";
+		dt_hdr.insertCell().textContent = "TX";
+
+		var dt_c_rate = details_table.insertRow();
+		dt_c_rate.insertCell("Bitrate");
+		var dt_c_rate_rx = dt_c_rate.insertCell();
+		var dt_c_rate_tx = dt_c_rate.insertCell();
+
+		var properties = {
+			'wrapper_row': iface_table_row,
+			'rate': {'rx': dt_c_rate_rx, 'tx': dt_c_rate_tx},
+		};
+
+		var methods = {
+			'set_visibility': function(state) {
+				console.log(state);
+			},
+			'update_data': function(data) {
+				properties.rate.rx.textContent = data.rx_rate.rate;
+				properties.rate.tx.textContent = data.tx_rate.rate;
+				console.log(data);
+			},
+			'destroy': function() {
+				iface_table_row.parentNode.removeChild(iface_table_row);
+			}
+		}
+		return methods;
+	}
+
 	function Neighbour(iface, addr, color, destroy) {
 		var th = iface.table.firstElementChild;
 		var el = iface.table.insertRow();
+		var details = NeighbourDetails(iface);
 
 		var tdHostname = el.insertCell();
 		tdHostname.setAttribute('data-label', th.children[0].textContent);
@@ -522,6 +558,7 @@
 					iface.signalgraph.removeSignal(signal);
 
 				el.parentNode.removeChild(el);
+				details.destroy();
 				destroy();
 			}, 60000);
 		}
@@ -655,6 +692,8 @@
 
 			        el.classList.toggle('inactive', wifi.inactive > inactiveLimit);
 				signal.set(wifi.inactive > inactiveLimit ? null : wifi.signal);
+
+				details.update_data(wifi);
 
 				updated();
 			},
