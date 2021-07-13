@@ -429,23 +429,34 @@
 	}
 
 	function NeighbourDetails(iface) {
-        var iface_table_row = iface.table.insertRow();
+		var iface_table_row = iface.table.insertRow();
 
-        var skel_table = document.getElementById("neighbour-detail-table-skel")
-        var details_block = skel_table.cloneNode(true)
-        details_block.id = null;
+		var skel_table = document.getElementById("neighbour-detail-table-skel")
+		var details_block = skel_table.cloneNode(true)
+		details_block.id = null;
 
-        iface_table_row.appendChild(details_block);
+		iface_table_row.appendChild(details_block);
 
 		var properties = {
 			'wrapper_row': iface_table_row,
-			'rate': {'rx': details_block.getElementsByClassName("column-bitrate-rx")[0], 'tx': details_block.getElementsByClassName("column-bitrate-tx")[0]},
+			'rate': {
+				'rx': details_block.getElementsByClassName("column-bitrate-rx")[0],
+				'tx': details_block.getElementsByClassName("column-bitrate-tx")[0]
+			},
+			'packets': {
+				'rx': details_block.getElementsByClassName("column-packets-rx")[0],
+				'tx': details_block.getElementsByClassName("column-packets-tx")[0],
+			},
+			'bytes': {
+				'rx': details_block.getElementsByClassName("column-bytes-rx")[0],
+				'tx': details_block.getElementsByClassName("column-bytes-tx")[0],
+			},
 		};
 
-        function rate_format(rate) {
-            var rate_mbit = rate/1000;
-            return rate_mbit.toFixed(2).concat(" Mbit/s");
-        }
+		function rate_format(rate) {
+			var rate_mbit = rate/1000;
+			return rate_mbit.toFixed(2).concat(" Mbit/s");
+		}
 
 		var methods = {
 			'set_visibility': function(state) {
@@ -454,7 +465,10 @@
 			'update_data': function(data) {
 				properties.rate.rx.textContent = rate_format(data.rx_rate.rate);
 				properties.rate.tx.textContent = rate_format(data.tx_rate.rate);
-				console.log(data);
+				properties.packets.rx.textContent = rate_format(data.rx_packets);
+				properties.packets.tx.textContent = rate_format(data.tx_packets);
+				properties.bytes.rx.textContent = rate_format(data.rx_bytes);
+				properties.bytes.tx.textContent = rate_format(data.tx_bytes);
 			},
 			'destroy': function() {
 				iface_table_row.parentNode.removeChild(iface_table_row);
