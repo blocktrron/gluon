@@ -21,6 +21,15 @@ for name, config in pairs(site.autoupdater.branches()) do
 	end
 end
 
+uci:foreach('autoupdater', 'request-header', function(header)
+	uci:delete('autoupdater', header['.name'])
+end)
+
+uci:section('autoupdater', 'request-header', 'gluon-version', {
+	name = 'X-Gluon-Version',
+	value = util.trim(util.readfile('/lib/gluon/gluon-version')),
+})
+
 if not uci:get('autoupdater', 'settings') then
 	local enabled = unistd.access('/lib/gluon/autoupdater/default_enabled') ~= nil
 
