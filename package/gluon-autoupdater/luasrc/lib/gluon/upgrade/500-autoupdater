@@ -1,6 +1,7 @@
 #!/usr/bin/lua
 
 local site = require 'gluon.site'
+local util = require 'gluon.util'
 local uci = require('simple-uci').cursor()
 local unistd = require 'posix.unistd'
 
