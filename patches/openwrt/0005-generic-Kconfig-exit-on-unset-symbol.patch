@@ -1,0 +1,35 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 23 Jul 2021 01:32:38 +0200
+Subject: generic: Kconfig: exit on unset symbol
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/include/kernel-build.mk b/include/kernel-build.mk
+index 66a9f64c802959061bceae23266688cbeb91b439..80da4455bc04fccd1c7834fe8b94c29399289bd2 100644
+--- a/include/kernel-build.mk
++++ b/include/kernel-build.mk
+@@ -132,6 +132,7 @@ define BuildKernel
+   $(LINUX_DIR)/.modules: export STAGING_PREFIX=$$(STAGING_DIR_HOST)
+   $(LINUX_DIR)/.modules: export PKG_CONFIG_PATH=$$(STAGING_DIR_HOST)/lib/pkgconfig
+   $(LINUX_DIR)/.modules: export PKG_CONFIG_LIBDIR=$$(STAGING_DIR_HOST)/lib/pkgconfig
++  $(LINUX_DIR)/.modules: export FAIL_ON_UNCONFIGURED=1
+   $(LINUX_DIR)/.modules: $(STAMP_CONFIGURED) $(LINUX_DIR)/.config FORCE
+ 	$(Kernel/CompileModules)
+ 	touch $$@
+diff --git a/target/linux/generic/hack-5.4/205-kconfig-exit.patch b/target/linux/generic/hack-5.4/205-kconfig-exit.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8931ad3270bc8983f4b94e883f170b97056bab79
+--- /dev/null
++++ b/target/linux/generic/hack-5.4/205-kconfig-exit.patch
+@@ -0,0 +1,11 @@
++--- a/scripts/kconfig/conf.c
+++++ b/scripts/kconfig/conf.c
++@@ -212,6 +212,8 @@ static int conf_sym(struct menu *menu)
++ 				break;
++ 			continue;
++ 		case 0:
+++			if (!sym_has_value(sym) && !tty_stdio && getenv("FAIL_ON_UNCONFIGURED"))
+++				exit(1);
++ 			newval = oldval;
++ 			break;
++ 		case '?':
