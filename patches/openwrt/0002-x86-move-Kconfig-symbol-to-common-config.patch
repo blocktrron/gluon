@@ -1,0 +1,67 @@
+From 1ded7a2c12e7b240e6fbddac8e83b26e571f7b95 Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 29 Jul 2021 22:58:09 +0200
+Subject: [PATCH 2/3] x86: move Kconfig symbol to common config
+
+This is required for all x86 targets. x86-legacy missed this config
+symbol, breaking the build.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+---
+ target/linux/x86/64/config-5.4      | 1 -
+ target/linux/x86/config-5.4         | 1 +
+ target/linux/x86/generic/config-5.4 | 1 -
+ target/linux/x86/geode/config-5.4   | 1 -
+ 4 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/target/linux/x86/64/config-5.4 b/target/linux/x86/64/config-5.4
+index 4c2e591501..348165a209 100644
+--- a/target/linux/x86/64/config-5.4
++++ b/target/linux/x86/64/config-5.4
+@@ -257,7 +257,6 @@ CONFIG_ILLEGAL_POINTER_VALUE=0xdead000000000000
+ CONFIG_INPUT_XEN_KBDDEV_FRONTEND=y
+ CONFIG_INTEL_GTT=y
+ CONFIG_INTEL_IDLE=y
+-# CONFIG_INTEL_INT0002_VGPIO is not set
+ # CONFIG_INTEL_IPS is not set
+ # CONFIG_INTEL_MENLOW is not set
+ # CONFIG_INTEL_MIC_BUS is not set
+diff --git a/target/linux/x86/config-5.4 b/target/linux/x86/config-5.4
+index f26c20c59d..6676f9501a 100644
+--- a/target/linux/x86/config-5.4
++++ b/target/linux/x86/config-5.4
+@@ -282,6 +282,7 @@ CONFIG_INIT_STACK_NONE=y
+ CONFIG_INPUT=y
+ CONFIG_INPUT_KEYBOARD=y
+ CONFIG_INSTRUCTION_DECODER=y
++# CONFIG_INTEL_INT0002_VGPIO is not set
+ # CONFIG_INTEL_MEI_HDCP is not set
+ # CONFIG_INTEL_PCH_THERMAL is not set
+ # CONFIG_INTEL_POWERCLAMP is not set
+diff --git a/target/linux/x86/generic/config-5.4 b/target/linux/x86/generic/config-5.4
+index 65dc36107b..b6fd4b293c 100644
+--- a/target/linux/x86/generic/config-5.4
++++ b/target/linux/x86/generic/config-5.4
+@@ -218,7 +218,6 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
+ CONFIG_INPUT_XEN_KBDDEV_FRONTEND=y
+ CONFIG_INTEL_GTT=y
+ CONFIG_INTEL_IDLE=y
+-# CONFIG_INTEL_INT0002_VGPIO is not set
+ # CONFIG_INTEL_IPS is not set
+ # CONFIG_INTEL_MENLOW is not set
+ CONFIG_INTEL_PCH_THERMAL=y
+diff --git a/target/linux/x86/geode/config-5.4 b/target/linux/x86/geode/config-5.4
+index 651c369178..83463bae56 100644
+--- a/target/linux/x86/geode/config-5.4
++++ b/target/linux/x86/geode/config-5.4
+@@ -57,7 +57,6 @@ CONFIG_I2C_ALGOPCA=y
+ CONFIG_I2C_ALGOPCF=y
+ CONFIG_I2C_BOARDINFO=y
+ # CONFIG_I2C_MULTI_INSTANTIATE is not set
+-# CONFIG_INTEL_INT0002_VGPIO is not set
+ # CONFIG_INTEL_IPS is not set
+ # CONFIG_INTEL_MENLOW is not set
+ # CONFIG_INTEL_PMC_IPC is not set
+-- 
+2.32.0
+

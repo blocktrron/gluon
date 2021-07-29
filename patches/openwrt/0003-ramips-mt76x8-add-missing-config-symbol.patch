@@ -1,0 +1,27 @@
+From 4af43df3dbc90048462e9d2abf603e0bb31e5e82 Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 29 Jul 2021 22:58:57 +0200
+Subject: [PATCH 3/3] ramips: mt76x8: add missing config symbol
+
+PWM_MEDIATEK was not defined, breaking builds for the mt76x8 subtarget.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+---
+ target/linux/ramips/mt76x8/config-5.4 | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/target/linux/ramips/mt76x8/config-5.4 b/target/linux/ramips/mt76x8/config-5.4
+index ec21b3722b..dfd01598ad 100644
+--- a/target/linux/ramips/mt76x8/config-5.4
++++ b/target/linux/ramips/mt76x8/config-5.4
+@@ -199,6 +199,7 @@ CONFIG_PHY_RALINK_USB=y
+ CONFIG_PINCTRL=y
+ CONFIG_PINCTRL_RT2880=y
+ # CONFIG_PINCTRL_SINGLE is not set
++# CONFIG_PWM_MEDIATEK is not set
+ CONFIG_RALINK=y
+ # CONFIG_RALINK_WDT is not set
+ CONFIG_REGMAP=y
+-- 
+2.32.0
+

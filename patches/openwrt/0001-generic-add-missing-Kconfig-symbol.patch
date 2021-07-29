@@ -1,0 +1,28 @@
+From fab565e7a574dd9eab2659f172b274d28f49fc6f Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 29 Jul 2021 22:57:24 +0200
+Subject: [PATCH 1/3] generic: add missing Kconfig symbol
+
+Fixes build errors for sunxi as well as rockchip targets.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+---
+ target/linux/generic/config-5.4 | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/target/linux/generic/config-5.4 b/target/linux/generic/config-5.4
+index 8d0f4a7306..7a4c6b2bee 100644
+--- a/target/linux/generic/config-5.4
++++ b/target/linux/generic/config-5.4
+@@ -996,6 +996,8 @@ CONFIG_CRYPTO_BLKCIPHER2=y
+ # CONFIG_CRYPTO_CRC32C_INTEL is not set
+ # CONFIG_CRYPTO_CRC32_ARM_CE is not set
+ # CONFIG_CRYPTO_CRCT10DIF is not set
++# CONFIG_CRYPTO_CRCT10DIF_ARM_CE is not set
++# CONFIG_CRYPTO_CRCT10DIF_ARM64_CE is not set
+ # CONFIG_CRYPTO_CRYPTD is not set
+ # CONFIG_CRYPTO_CTR is not set
+ # CONFIG_CRYPTO_CTS is not set
+-- 
+2.32.0
+
