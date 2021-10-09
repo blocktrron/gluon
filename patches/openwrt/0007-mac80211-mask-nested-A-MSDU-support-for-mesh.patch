@@ -14,7 +14,7 @@ Signed-off-by: David Bauer <mail@david-bauer.net>
 
 diff --git a/package/kernel/mac80211/patches/subsys/600-mac80211-mask-nested-A-MSDU-support-for-mesh.patch b/package/kernel/mac80211/patches/subsys/600-mac80211-mask-nested-A-MSDU-support-for-mesh.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..cc66fa823f87e995c1caf479a7f56da614cd2041
+index 0000000000000000000000000000000000000000..4f242b9c479c210f11e49f986e0df6162fd193e3
 --- /dev/null
 +++ b/package/kernel/mac80211/patches/subsys/600-mac80211-mask-nested-A-MSDU-support-for-mesh.patch
 @@ -0,0 +1,36 @@
@@ -46,7 +46,7 @@ index 0000000000000000000000000000000000000000..cc66fa823f87e995c1caf479a7f56da6
 + 
 +-	capab = (u16)(amsdu << 0);	/* bit 0 A-MSDU support */
 ++	capab = 0;
-++	if (!sta->mesh_sta)
+++	if (!sta->mesh)
 ++		capab = (u16)(amsdu << 0);	/* bit 0 A-MSDU support */
 + 	capab |= (u16)(policy << 1);	/* bit 1 aggregation policy */
 + 	capab |= (u16)(tid << 2); 	/* bit 5:2 TID number */
