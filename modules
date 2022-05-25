@@ -1,8 +1,8 @@
 GLUON_FEEDS='packages routing gluon'
 
-OPENWRT_REPO=https://github.com/openwrt/openwrt.git
+OPENWRT_REPO=https://git.openwrt.org/openwrt/staging/blocktrron.git
 OPENWRT_BRANCH=openwrt-22.03
-OPENWRT_COMMIT=34b6abf5a8f8751e377bae4978e38a0f2326bdae
+OPENWRT_COMMIT=37bc752f1535609deeb61d184713aef22cf350ec
 
 PACKAGES_PACKAGES_REPO=https://github.com/openwrt/packages.git
 PACKAGES_PACKAGES_BRANCH=openwrt-22.03
