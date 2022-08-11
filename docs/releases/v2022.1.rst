@@ -1,174 +1,162 @@
-Written up to a9fff111 # Added HW/Support
+Gluon 2022.1
+============
+
+.. Written up to a9fff111 # Added HW/Support
+
+Added hardware support
+----------------------
+
 
 ath79-generic
-=============
+~~~~~~~~~~~~~
 
-D-Link
-------
+* D-Link
 
--  DAP-2660 A1
+    - DAP-2660 A1
 
-Enterasys
----------
+* Enterasys
 
--  WS-AP3705i
+    - WS-AP3705i
 
-Siemens
--------
+* Siemens
 
--  WS-AP3610
+    - WS-AP3610
 
-TP-Link
--------
+* TP-Link
 
--  Archer A7 v5
--  CPE510 v2
--  CPE510 v3
--  CPE710 v1
--  EAP225-Outdoor v1
--  WBS210 v2
+    - Archer A7 v5
+    - CPE510 v2
+    - CPE510 v3
+    - CPE710 v1
+    - EAP225-Outdoor v1
+    - WBS210 v2
 
 ath79-mikrotik
-==============
+~~~~~~~~~~~~~~
 
-Mikrotik
---------
+* Mikrotik
 
--  RB951Ui-2nD
+    - RB951Ui-2nD
 
 ipq40xx-generic
-===============
+~~~~~~~~~~~~~~~
 
-Aruba Networks
---------------
+* Aruba Networks
 
--  Aruba AP-303H
--  Aruba AP-365
--  InstantOn AP11D
--  InstantOn AP17
+    - Aruba AP-303H
+    - Aruba AP-365
+    - InstantOn AP11D
+    - InstantOn AP17
 
 ipq40xx-mikrotik
-================
+~~~~~~~~~~~~~~~~
 
--  SXTsq-5-AC
+* Mikrotik
+
+    - SXTsq-5-AC
 
 ramips-mt7620
-=============
+~~~~~~~~~~~~~
 
-Xiaomi
-------
+* Xiaomi
 
--  Mi Router 3G (v2)
+    - Mi Router 3G (v2)
 
 ramips-mt7621
-=============
+~~~~~~~~~~~~~
 
-Cudy
-----
+* Cudy
 
--  WR2100
+    - WR2100
 
-Netgear
--------
+* Netgear
 
--  R6260
--  WAC104
+    - R6260
+    - WAC104
 
 .. _tp-link-1:
 
-TP-Link
--------
+* TP-Link
 
--  RE650v1
+    - RE650v1
 
-Ubiquiti
---------
+* Ubiquiti
 
--  UniFi 6 Lite
+    - UniFi 6 Lite
 
-Xiaomi
-------
+* Xiaomi
 
--  Mi Router 4A (Gigabit Edition)
+    - Mi Router 4A (Gigabit Edition)
 
 ramips-mt7622
-=============
-
-Linksys
--------
-
--  E8450
+~~~~~~~~~~~~~
 
 .. _xiaomi-1:
 
-Xiaomi
-------
+* Xiaomi
 
--  AX3200
+    - AX3200
 
 .. _ubiquiti-1:
 
-Ubiquiti
---------
+* Ubiquiti
 
--  UniFi 6 LR
+    - UniFi 6 LR
 
 ramips-mt76x8
-=============
+~~~~~~~~~~~~~
 
-GL.iNet
--------
+* GL.iNet
 
--  microuter-N300
+    - microuter-N300
 
--  .. rubric:: RAVPower
-      :name: ravpower
+.. _ravpower-1:
 
--  RP-WD009
+* RAVPower
+
+    - RP-WD009
 
 .. _tp-link-2:
 
-TP-Link
--------
+* TP-Link
 
--  Archer C20 v4
--  Archer C20 v5
--  RE200 v2
+    - Archer C20 v4
+    - Archer C20 v5
+    - RE200 v2
 
 .. _xiaomi-2:
 
-Xiaomi
-------
+* Xiaomi
 
--  Mi Router 4C
--  Mi Router 4A (100M Edition)
+    - Mi Router 4C
+    - Mi Router 4A (100M Edition)
 
 rockchip-armv8
-==============
+~~~~~~~~~~~~~~
 
--  FriendlyElec NanoPi R2S
+* FriendlyElec
+
+    - NanoPi R2S
 
 mpc85xx-p1010
-=============
+~~~~~~~~~~~~~
 
-Sophos
-------
+* Sophos
 
--  RED 15w rev. 1
+    - RED 15w rev. 1
 
 mpc85xx-p1020
-=============
+~~~~~~~~~~~~~
 
-Extreme Networks
-----------------
+* Extreme Networks
 
--  WS-AP3825i
+    - WS-AP3825i
 
 Device changes
-==============
+--------------
 
 Renamed Devices
----------------
+~~~~~~~~~~~~~~~
 
 -  The ``brcm2708-bcm2708`` ``brcm2708-bcm2709`` ``brcm2708-bcm2710``
    targets were renamed to ``bcm27xx-bcm2708`` ``bcm27xx-bcm2709`` and
@@ -176,7 +164,7 @@ Renamed Devices
 -  The GL.iNet GL-AR750S was moved to the ``ath79-nand`` subtarget
 
 Atheros target migration
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 All Atheros MIPS devices built with the ``ar71xx-generic``,
 ``ar71xx-nand`` as well as ``ar71xx-tiny`` were deprecated upstream and
@@ -332,15 +320,15 @@ VoCore
 -  VoCore (8M, 16M)
 
 Features
-========
+--------
 
 Wireguard
----------
+~~~~~~~~~
 
 ToDo: LEMOER OR AIYION
 
 fastd L2TP
-----------
+~~~~~~~~~~
 
 fastd can now act as a connection broker for unencrypted L2TP-based
 tunneling within Gluons mesh-vpn framework.
@@ -349,7 +337,7 @@ In addition to a sufficient configured fastd-based VPN server, this
 requires adding the ``null@l2tp`` method to the fastd site.
 
 Network changes (DSA / Upgrade-Behavior)
-========================================
+----------------------------------------
 
 The ramips-mt7621 and lantiq-xrx200 targets now use the upstream DSA
 subsystem instead of OpenWrt swconfig for managing ethernet switches.
@@ -359,20 +347,20 @@ to DSA syntax. See the section about network reconfiguration for more
 details.
 
 Site changes
-============
+------------
 
 VPN provider MTU
-----------------
+~~~~~~~~~~~~~~~~
 
 To account for multiple VPN methods available for a site, the MTU used
 for the VPN tunnel connection is now moved to the specific VPN provider
 configuration.
 
 Internal changes
-================
+----------------
 
 Misc
-----
+~~~~
 
 -  Gluon now ships the ath10k-ct firmware deriavation for ath10k Wave 2
    radio
@@ -386,7 +374,7 @@ Misc
 -  ``GLUON_DEPRECATED`` is now set to 0 by default
 
 Setup mode
-----------
+~~~~~~~~~~
 
 -  To reboot a running gluon-node into setup-mode, Gluon now offers the
    ``gluon-enter-setup-mode`` command
@@ -394,7 +382,7 @@ Setup mode
    anymore
 
 System reconfiguration
-----------------------
+~~~~~~~~~~~~~~~~~~~~~~
 
 The network and system-LED configurations are now re-generated after
 each update / invocation of ``gluon-reconfigure``.
@@ -407,7 +395,7 @@ interfaces. This behavior is explained here –>
 https://github.com/freifunk-gluon/gluon/pull/2584/files
 
 Autoupdater
------------
+~~~~~~~~~~~
 
 The Autoupdater now uses the site default branch in case it is
 configured to use a non-existant / invalid branch.
