@@ -13,6 +13,7 @@ RUN apt update && apt install -y --no-install-recommends \
     zlib1g-dev \
     libssl-dev \
     libelf-dev \
+    curl \
     wget \
     time \
     ecdsautils \

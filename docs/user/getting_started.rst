@@ -36,6 +36,7 @@ freshly installed Debian Stretch system the following packages are required:
 * `libncurses-dev` (actually `libncurses5-dev`)
 * `libz-dev` (actually `zlib1g-dev`)
 * `libssl-dev`
+* `curl`
 * `wget`
 * `time` (built-in `time` doesn't work)
 
