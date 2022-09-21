@@ -81,18 +81,14 @@ config('GLUON_MINIFY', istrue(env.GLUON_MINIFY))
 
 packages {
 	'-ca-bundle',
-	'-kmod-ipt-offload',
-	'-kmod-nft-offload',
 	'-libustream-wolfssl',
 	'-libwolfssl',
-	'-nftables',
 	'-odhcpd-ipv6only',
 	'-ppp',
 	'-ppp-mod-pppoe',
 	'-wpad-mini',
 	'-wpad-basic',
 	'-wpad-basic-wolfssl',
-	'-firewall4',
+	'firewall4',
 	'gluon-core',
-	'ip6tables-zz-legacy',
 }
