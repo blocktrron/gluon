@@ -1,0 +1,68 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 15 Jan 2023 16:22:16 +0100
+Subject: odhcpd: allow alternative config-dir
+
+diff --git a/package/network/services/odhcpd/patches/0001-config-add-option-to-set-UCI-path.patch b/package/network/services/odhcpd/patches/0001-config-add-option-to-set-UCI-path.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..f665fcb094f3899aeeef465b1e23135c14abc5ca
+--- /dev/null
++++ b/package/network/services/odhcpd/patches/0001-config-add-option-to-set-UCI-path.patch
+@@ -0,0 +1,58 @@
++From c497b19ec736c57a20367637ea03e63799550225 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 15 Jan 2023 14:49:27 +0100
++Subject: [PATCH] config: add option to set UCI path
++
++---
++ src/config.c | 3 +++
++ src/odhcpd.c | 8 +++++++-
++ src/odhcpd.h | 1 +
++ 3 files changed, 11 insertions(+), 1 deletion(-)
++
++--- a/src/config.c
+++++ b/src/config.c
++@@ -1205,6 +1205,9 @@ void odhcpd_reload(void)
++ 	if (!uci)
++ 		return;
++ 
+++	if (config.uci_path)
+++			uci_set_confdir(uci, config.uci_path);
+++
++ 	vlist_update(&leases);
++ 	avl_for_each_element(&interfaces, i, avl)
++ 		clean_interface(i);
++--- a/src/odhcpd.c
+++++ b/src/odhcpd.c
++@@ -55,6 +55,7 @@ static void print_usage(const char *app)
++ {
++ 	printf(
++ 	"== %s Usage ==\n\n"
+++	"  -c           define UCI config path\n"
++ 	"  -h, --help   Print this help\n"
++ 	"  -l level     Specify log level 0..7 (default %d)\n",
++ 		app, config.log_level
++@@ -78,8 +79,13 @@ int main(int argc, char **argv)
++ 	openlog("odhcpd", LOG_PERROR | LOG_PID, LOG_DAEMON);
++ 	int opt;
++ 
++-	while ((opt = getopt(argc, argv, "hl:")) != -1) {
+++	config.uci_path = NULL;
+++
+++	while ((opt = getopt(argc, argv, "c:hl:")) != -1) {
++ 		switch (opt) {
+++		case 'd':
+++			config.uci_path = optarg;
+++			break;
++ 		case 'h':
++ 			print_usage(argv[0]);
++ 			return 0;
++--- a/src/odhcpd.h
+++++ b/src/odhcpd.h
++@@ -161,6 +161,7 @@ struct config {
++ 	bool main_dhcpv4;
++ 	char *dhcp_cb;
++ 	char *dhcp_statefile;
+++	char *uci_path;
++ 	int log_level;
++ };
++ 
