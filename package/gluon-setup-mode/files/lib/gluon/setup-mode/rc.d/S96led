@@ -3,6 +3,8 @@
 START=96
 
 start() {
+	local custom_led
+
 	/etc/init.d/led start
 
 	. /etc/diag.sh
@@ -14,6 +16,11 @@ start() {
 	fi
 	if [ -z $status_led ]; then
 		status_led="$boot"
+	fi
+
+	custom_led="$(lua -e 'print(require("gluon.setup-mode").get_custom_led() or "")')"
+	if [ -z $status_led ]; then
+		status_led="$custom_led"
 	fi
 
 	status_led_set_timer 1000 300
