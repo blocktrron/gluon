@@ -1,0 +1,20 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 1 Mar 2023 00:19:20 +0100
+Subject: test
+
+diff --git a/target/linux/generic/backport-5.10/001-fs.patch b/target/linux/generic/backport-5.10/001-fs.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..f8ef1122ef58b75008d4aa373cda5d6641d87102
+--- /dev/null
++++ b/target/linux/generic/backport-5.10/001-fs.patch
+@@ -0,0 +1,10 @@
++--- a/arch/mips/kernel/traps.c
+++++ b/arch/mips/kernel/traps.c
++@@ -2454,6 +2454,7 @@ void __init trap_init(void)
++ 	 * Some CPUs can enable/disable for cache parity detection, but does
++ 	 * it different ways.
++ 	 */
+++	pr_warn("Zone ranges:\n");
++ 	parity_protection_init();
++ 
++ 	/*
