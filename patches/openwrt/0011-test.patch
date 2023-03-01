@@ -1,0 +1,47 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 1 Mar 2023 01:06:22 +0100
+Subject: test
+
+diff --git a/target/linux/generic/backport-5.10/001-fs.patch b/target/linux/generic/backport-5.10/001-fs.patch
+index 22d995cc58a167dd0958e6b4345b6f08a273f314..ff134050a77f9563799df4c5bef75c8902426e1a 100644
+--- a/target/linux/generic/backport-5.10/001-fs.patch
++++ b/target/linux/generic/backport-5.10/001-fs.patch
+@@ -1,18 +1,34 @@
+ --- a/arch/mips/kernel/traps.c
+ +++ b/arch/mips/kernel/traps.c
+-@@ -2364,6 +2364,7 @@ void __init trap_init(void)
++@@ -2363,7 +2363,9 @@ void __init trap_init(void)
++ 	unsigned long i, vec_size;
+  	phys_addr_t ebase_pa;
+  
+- 	check_wait();
+ +	pr_warn("Zone ranges:\n");
++ 	check_wait();
+++	//pr_warn("Zone ranges:\n");
+  
+  	if (!cpu_has_mips_r2_r6) {
+  		ebase = CAC_BASE;
+-@@ -2454,6 +2455,7 @@ void __init trap_init(void)
++@@ -2407,11 +2409,13 @@ void __init trap_init(void)
++ 		else
++ 			write_c0_config3(config3 & ~MIPS_CONF3_ISA_OE);
++ 	}
+++	//pr_warn("Zone ranges:\n");
++ 
++ 	if (board_ebase_setup)
++ 		board_ebase_setup();
++ 	per_cpu_trap_init(true);
++ 	memblock_set_bottom_up(false);
+++	//pr_warn("Zone ranges:\n");
++ 
++ 	/*
++ 	 * Copy the generic exception handlers to their final destination.
++@@ -2454,6 +2458,7 @@ void __init trap_init(void)
+  	 * Some CPUs can enable/disable for cache parity detection, but does
+  	 * it different ways.
+  	 */
+-+	pr_warn("Zone ranges:\n");
+++	//pr_warn("Zone ranges:\n");
+  	parity_protection_init();
+  
+  	/*
