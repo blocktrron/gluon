@@ -137,9 +137,9 @@ device('zyxel-nbg6617', 'zyxel_nbg6617')
 
 -- 8devices
 
-device('8devices-jalapeno', '8dev_jalapeno', {
-	factory = '-squashfs-nand-factory',
-	factory_ext = '.ubi',
-	sysupgrade = '-squashfs-nand-sysupgrade',
-	sysupgrade_ext = '.bin',
-})
+-- device('8devices-jalapeno', '8dev_jalapeno', {
+--	factory = '-squashfs-nand-factory',
+--	factory_ext = '.ubi',
+--	sysupgrade = '-squashfs-nand-sysupgrade',
+--	sysupgrade_ext = '.bin',
+-- })
