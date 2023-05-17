@@ -1,6 +1,13 @@
 -- ASUS
 
 device('asus_tuf-ax4200', 'asus_tuf-ax4200', {
-	factory = false,
+factory = false,
+})
+
+
+-- Cudy
+
+device('cudy-wr3000-v1', 'cudy_wr3000-v1', {
+factory = false,
 })
 
