@@ -1,8 +1,8 @@
 GLUON_FEEDS='packages routing gluon'
 
-OPENWRT_REPO=https://github.com/openwrt/openwrt.git
-OPENWRT_BRANCH=master
-OPENWRT_COMMIT=3a6657540c3d6fc50a63caf8432e301e825ada16
+OPENWRT_REPO=https://git.openwrt.org/openwrt/staging/blocktrron.git
+OPENWRT_BRANCH=rutx50-no-qmux
+OPENWRT_COMMIT=9aa17761ad04513a0b663883eb0fd971c1ffcdee
 
 PACKAGES_PACKAGES_REPO=https://github.com/openwrt/packages.git
 PACKAGES_PACKAGES_BRANCH=master
