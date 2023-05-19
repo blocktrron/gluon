@@ -79,6 +79,7 @@ function M.is_cellular_device()
 		return true
 	elseif M.match('ipq40xx', 'generic', {
 		'glinet,gl-ap1300',
+		'teltonika,rutx50',
 	}) then
 		return true
 	elseif M.match('ramips', 'mt7621', {
