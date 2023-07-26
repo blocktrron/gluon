@@ -18,3 +18,8 @@ device('gl.inet-gl-mt3000', 'glinet_gl-mt3000', {
 factory = false,
 })
 
+
+-- ZyXEL
+
+device('zyxel-nwa50ax-pro', 'zyxel_nwa50ax-pro')
+
