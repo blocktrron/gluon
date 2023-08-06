@@ -1,3 +1,10 @@
+-- Acer
+
+device('acer-predator-w6', 'acer_predator-w6', {
+factory = false,
+})
+
+
 -- ASUS
 
 device('asus_tuf-ax4200', 'asus_tuf-ax4200', {
