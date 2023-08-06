@@ -113,12 +113,17 @@ function M.foreach_radio(uci, f)
 
 	for index, radio in ipairs(radios) do
 		local band = radio.band
+		local site_band = nil
 
 		if band == '2g' then
-			f(radio, index, site.wifi24)
+			site_band = site.wifi24
 		elseif band == '5g' then
-			f(radio, index, site.wifi5)
+			site_band = site.wifi5
+		elseif band == '6g' then
+			site_band = site.wifi6
 		end
+
+		f(radio, index, site_band)
 	end
 end
 

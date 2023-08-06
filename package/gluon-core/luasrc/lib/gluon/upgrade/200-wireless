@@ -12,6 +12,21 @@ local uci = require('simple-uci').cursor()
 if not sysconfig.gluon_version then
 	uci:delete_all('wireless', 'wifi-iface')
 
+	-- We need to configure the 6GHz parameters on a 6GHz radio
+	-- on initial installation
+	-- TODO: Implement auto-channel assignment using the 2.4 / 5GHz
+	-- logic below. We have no device with this case yet.
+	wireless.foreach_radio(uci, function(radio)
+		local radio_name = radio['.name']
+		local freqlist = iwinfo.nl80211.freqlist(wireless.find_phy(radio))
+		
+		for _, v in ipairs(freqlist) do
+			if v["mhz"] > 5900 and v["mhz"] < 7200 then
+				uci:set('wireless', radio_name, 'band', '6g')
+			end
+		end
+	end)
+
 	-- First count all radios with a fixed frequency band.
 	-- This is needed to distribute devices which have radios
 	-- capable of operating in the 2.4 GHz and 5 GHz band need
@@ -235,6 +250,8 @@ wireless.foreach_radio(uci, function(radio, index, config)
 			uci:delete('wireless', radio_name, 'country3')
 			configure_mesh_wireless(radio, index, config)
 		end
+	elseif band == '6g' then
+		-- Nothing to set for 6 GHz
 	end
 
 	uci:set('wireless', radio_name, 'beacon_int', beacon_interval)
