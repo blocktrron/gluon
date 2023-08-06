@@ -106,10 +106,11 @@ end
 wireless.foreach_radio(uci, function(radio, index, config)
 	local radio_name = radio['.name']
 
-	configure_ap(radio, index, config, radio_name)
-
 	configure_owe(radio, index, config, radio_name)
-	configure_owe_transition_mode(config, radio_name)
+	if radio.band ~= "6g" then
+		configure_ap(radio, index, config, radio_name)
+		configure_owe_transition_mode(config, radio_name)
+	end
 end)
 
 uci:save('wireless')
