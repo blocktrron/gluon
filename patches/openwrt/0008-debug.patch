@@ -1,0 +1,27 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Mon, 18 Sep 2023 17:19:03 +0200
+Subject: debug
+
+diff --git a/package/kernel/mac80211/patches/build/900-ffs-debug.patch b/package/kernel/mac80211/patches/build/900-ffs-debug.patch
+index 19a5d3e066417837f565f8581a3b235583116a64..d2efe966d176b4fdada359d9c5bd80c71195bc63 100644
+--- a/package/kernel/mac80211/patches/build/900-ffs-debug.patch
++++ b/package/kernel/mac80211/patches/build/900-ffs-debug.patch
+@@ -2,12 +2,12 @@
+ +++ b/net/mac80211/sta_info.c
+ @@ -2355,6 +2355,10 @@ static void sta_stats_decode_rate(struct
+  
+-               sband = local->hw.wiphy->bands[band];
++ 		sband = local->hw.wiphy->bands[band];
+  
+-+              printk("sband = %p, band = 0x%x\n", sband, band);
+-+              if (!sband)
+-+                      break;
+++		printk("sband = %p, band = 0x%x\n", sband, band);
+++		if (!sband)
+++			break;
+ +
+-               if (WARN_ON_ONCE(!sband->bitrates))
+-                       break;
++ 		if (WARN_ON_ONCE(!sband->bitrates))
++ 			break;
+  
