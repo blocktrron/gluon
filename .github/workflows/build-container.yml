@@ -34,10 +34,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/freifunk-gluon/${{ env.IMAGE_NAME }}
       - name: Build and push Docker image
-        uses: docker/build-push-action@4c1b68d83ad20cc1a09620ca477d5bbbb5fa14d0
+        uses: docker/build-push-action@v5
         with:
           context: ./contrib/docker
-          outputs: type=docker,dest=/tmp/build-gluon.tar
+          outputs: type=docker,dest=/tmp/build-gluon.tar,name=test
           push: ${{ github.repository_owner == 'freifunk-gluon' && github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
