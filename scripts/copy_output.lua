@@ -94,3 +94,8 @@ if (env.GLUON_DEVICES or '') == '' then
 	mkdir(dest_dir(package_prefix))
 	lib.exec {'cp', 'openwrt/bin/targets/'..bindir..'/packages/\0', dest_dir(package_prefix)}
 end
+
+-- Copy SDK
+if (env.GLUON_SDK or '') != '1' then
+	-- ToDo: Copy SDK
+end

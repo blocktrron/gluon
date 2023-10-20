@@ -253,6 +253,10 @@ GLUON_DEBUG
   Setting ``GLUON_DEBUG=1`` will provide firmware images including debugging symbols usable with GDB or
   similar tools. Requires a device or target with at least 16 MB of flash space, e.g. `x86-64`. Unset by default.
 
+GLUON_SDK
+  Setting ``GLUON_SDK=1`` will build the OpenWrt SDK for use with the built Gluon images. This allows users to
+  develop and build their own packages for the built Gluon images. Unset by default.
+
 GLUON_MINIFY
   Setting ``GLUON_MINIFY=0`` will omit the minification of scripts during the build process. By
   default the flag is set to ``1``. Disabling the flag is handy if human readable scripts on the

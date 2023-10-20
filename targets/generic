@@ -80,6 +80,7 @@ config('TARGET_PER_DEVICE_ROOTFS', true)
 config('GLUON_MULTIDOMAIN', istrue(env.GLUON_MULTIDOMAIN))
 
 config('AUTOREMOVE', istrue(env.GLUON_AUTOREMOVE))
+config('SDK', istrue(env.GLUON_SDK))
 
 if istrue(env.GLUON_DEBUG) then
 	config('DEBUG', true)
