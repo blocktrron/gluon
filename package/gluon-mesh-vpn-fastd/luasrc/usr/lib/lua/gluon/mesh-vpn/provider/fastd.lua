@@ -26,17 +26,24 @@ function M.active()
 end
 
 function M.set_limit(ingress_limit, egress_limit)
+	-- ToDo v2025.1.x: Remove legacy simple-tc
 	uci:delete('simple-tc', 'mesh_vpn')
+	uci:save('simple-tc')
+
 	if ingress_limit ~= nil and egress_limit ~= nil then
-		uci:section('simple-tc', 'interface', 'mesh_vpn', {
-			ifname = vpn_core.get_interface(),
+		uci:section('sqm', 'queue', 'mesh_vpn', {
+			interface = vpn_core.get_interface(),
 			enabled = true,
-			limit_egress = egress_limit,
-			limit_ingress = ingress_limit,
+			upload = egress_limit,
+			download = ingress_limit,
+			qdisc = 'cake',
+			script = 'piece_of_cake.qos',
+			debug_logging = '0',
+			verbosity = '5',
 		})
 	end
 
-	uci:save('simple-tc')
+	uci:save('sqm')
 end
 
 function M.mtu()

@@ -6,7 +6,7 @@ include ../gluon.mk
 
 define Package/gluon-mesh-vpn-fastd
   TITLE:=Support for connecting meshes via fastd
-  DEPENDS:=+gluon-core +libgluonutil +gluon-mesh-vpn-core +fastd +simple-tc
+  DEPENDS:=+gluon-core +libgluonutil +gluon-mesh-vpn-core +fastd +sqm-scripts
 endef
 
 $(eval $(call BuildPackageGluon,gluon-mesh-vpn-fastd))
