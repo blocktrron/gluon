@@ -1,0 +1,20 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 3 Nov 2023 22:05:04 +0100
+Subject: mediatek: add label-mac for GL.iNet GL-MT3000
+
+The MAC-address of gmac0 matches the one printed on the bottom label.
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/mediatek/dts/mt7981b-glinet-gl-mt3000.dts b/target/linux/mediatek/dts/mt7981b-glinet-gl-mt3000.dts
+index d916ee49ef6ffe9d76fd95c244cb1c8b8b49c741..27e7797b3b24ca2da933a21a5dd07fee6722947a 100644
+--- a/target/linux/mediatek/dts/mt7981b-glinet-gl-mt3000.dts
++++ b/target/linux/mediatek/dts/mt7981b-glinet-gl-mt3000.dts
+@@ -7,6 +7,7 @@
+ 	compatible = "glinet,gl-mt3000", "mediatek,mt7981";
+ 
+ 	aliases {
++		label-mac-device = &gmac0;
+ 		led-boot = &led_lightblue;
+ 		led-failsafe = &led_lightblue;
+ 		led-running = &led_white;
