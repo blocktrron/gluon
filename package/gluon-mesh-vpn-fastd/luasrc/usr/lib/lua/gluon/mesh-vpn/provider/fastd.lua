@@ -4,6 +4,8 @@ local site = require 'gluon.site'
 local util = require 'gluon.util'
 local vpn_core = require 'gluon.mesh-vpn'
 
+local unistd = require 'posix.unistd'
+
 local M = {}
 
 function M.public_key()
@@ -47,12 +49,16 @@ local function set_limit_sqm(ingress_limit, egress_limit)
 	})
 end
 
+local function sqm_available()
+	return unistd.access('/lib/gluon/mesh-vpn/sqm')
+end
+
 function M.set_limit(ingress_limit, egress_limit)
 	uci:delete('simple-tc', 'mesh_vpn')
 	uci:delete('sqm', 'mesh_vpn')
 
 	if ingress_limit ~= nil and egress_limit ~= nil then
-		if util.get_mem_total() < 200*1024 then
+		if not sqm_available() or util.get_mem_total() < 200*1024 then
 			set_limit_simple_tc(ingress_limit, egress_limit)
 		else
 			set_limit_sqm(ingress_limit, egress_limit)
