@@ -1,5 +1,6 @@
 local lib = dofile('scripts/target_lib.lua')
 local feature_lib = dofile('scripts/feature_lib.lua')
+local site_selection_lib = dofile('scripts/site_selection_lib.lua')
 local env = lib.env
 
 local target = env.GLUON_TARGET
@@ -86,10 +87,6 @@ END_MAKE
 	lib.escape(var)))
 end
 
-local function site_packages(image)
-	return split(site_vars(string.format('$(GLUON_%s_SITE_PACKAGES)', image)))
-end
-
 local function feature_packages(features)
 	local files = {'package/features'}
 	for _, feed in ipairs(feeds) do
@@ -102,20 +99,29 @@ local function feature_packages(features)
 	return feature_lib.get_packages(files, features)
 end
 
--- This involves running a few processes to evaluate site.mk, so we add a simple cache
-local class_cache = {}
-local function class_packages(class)
-	if class_cache[class] then
-		return class_cache[class]
+local function site_specific_packages(dev_info)
+	local packages_file_path = env.GLUON_SITEDIR .. '/packages'
+
+	local site_features = {}
+	local site_packages = {}
+
+	-- First read enabled features from site
+	if file_exists(packages_file_path) then
+		site_features = compact_list(site_selection_lib.get_selection('feature', {packages_file_path}, env, dev_info), false)
 	end
 
-	local features = site_vars(string.format('$(GLUON_FEATURES) $(GLUON_FEATURES_%s)', class))
-	features = compact_list(split(features), false)
+	-- Create List from packages inherited from features
+	local feature_inherited_pkgs = feature_packages(site_features)
 
-	local pkgs = feature_packages(features)
-	pkgs = concat_list(pkgs, split(site_vars(string.format('$(GLUON_SITE_PACKAGES) $(GLUON_SITE_PACKAGES_%s)', class))))
+	-- Read list of packages from site
+	if file_exists(packages_file_path) then
+		site_packages = site_selection_lib.get_selection('package', {packages_file_path}, env, dev_info)
+	end
 
-	class_cache[class] = pkgs
+	-- Concat feature-packages with site-packages
+	local pkgs = concat_list(feature_inherited_pkgs, site_packages)
+
+	-- Negations for the resulting package-list are dealt with in the calling function
 	return pkgs
 end
 
@@ -192,9 +198,8 @@ for _, dev in ipairs(lib.devices) do
 	end
 
 	handle_pkgs(lib.target_packages)
-	handle_pkgs(class_packages(dev.options.class))
 	handle_pkgs(dev.options.packages or {})
-	handle_pkgs(site_packages(dev.image))
+	handle_pkgs(site_specific_packages(dev))
 
 	local profile_config = string.format('%s_DEVICE_%s', openwrt_config_target, dev.name)
 	lib.config(
