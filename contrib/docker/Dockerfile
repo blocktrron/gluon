@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shellcheck \
     libnss-unknown \
     openssh-client \
+    swig \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
