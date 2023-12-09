@@ -1,6 +1,6 @@
 local lib = dofile('scripts/target_lib.lua')
 local feature_lib = dofile('scripts/feature_lib.lua')
-local site_selection_lib = dofile('scripts/site_selection_lib.lua')
+local image_customization_lib = dofile('scripts/image_customization_lib.lua')
 local env = lib.env
 
 local target = env.GLUON_TARGET
@@ -95,13 +95,13 @@ local function site_specific_packages(dev_info)
 
 	if file_exists(image_custoization) then
 		-- First read enabled features from site
-		site_features = compact_list(site_selection_lib.get_selection('feature', {image_custoization}, env, dev_info), false)
+		site_features = compact_list(image_customization_lib.get_selection('feature', {image_custoization}, env, dev_info), false)
 
 		-- Create List from packages inherited from features
 		feature_inherited_pkgs = feature_packages(site_features)
 
 		-- Read list of packages from site
-		site_packages = site_selection_lib.get_selection('package', {image_custoization}, env, dev_info)
+		site_packages = image_customization_lib.get_selection('package', {image_custoization}, env, dev_info)
 	end
 
 	-- Concat feature-packages with site-packages
