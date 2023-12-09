@@ -8,9 +8,10 @@ local function collect_keys(t)
 	return ret
 end
 
-function M.get_selection(selection_type, files, env, dev)
+local function evaluate_device(files, env, dev)
 	local selections = {}
 	local funcs = {}
+	local device_disabled = false
 
 	local function add_elements(element_type, element_list)
 		for _, element in ipairs(element_list) do
@@ -74,7 +75,15 @@ function M.get_selection(selection_type, files, env, dev)
 		f()
 	end
 
-	return collect_keys(selections[selection_type] or {})
+	return {
+		selections = selections,
+		device_disabled = device_disabled,
+	}
+end
+
+function M.get_selection(selection_type, files, env, dev)
+	local eval_result = evaluate_device(files, env, dev)
+	return collect_keys(eval_result.selections[selection_type] or {})
 end
 
 return M
