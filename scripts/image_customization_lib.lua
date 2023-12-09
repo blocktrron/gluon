@@ -11,7 +11,7 @@ end
 local function evaluate_device(files, env, dev)
 	local selections = {}
 	local funcs = {}
-	local device_disabled = false
+	local device_overrides = {}
 
 	local function add_elements(element_type, element_list)
 		for _, element in ipairs(element_list) do
@@ -23,12 +23,31 @@ local function evaluate_device(files, env, dev)
 		end
 	end
 
+	local function add_override(ovr_key, ovr_value)
+		device_overrides[ovr_key] = ovr_value
+	end
+
 	function funcs.Features(features)
 		add_elements('feature', features)
 	end
 
 	function funcs.Packages(packages)
 		add_elements('package', packages)
+	end
+
+	function funcs.Broken(broken)
+		assert(
+			type(broken) == 'bool',
+			'Incorrect use of Broken(): has to be a boolean value')
+		add_override('broken', broken)
+	end
+
+	function funcs.Disable()
+		add_override('disabled', true)
+	end
+
+	function funcs.Disavle_Factory()
+		add_override('disable_factory', true)
 	end
 
 	function funcs.device(device_names)
@@ -77,13 +96,18 @@ local function evaluate_device(files, env, dev)
 
 	return {
 		selections = selections,
-		device_disabled = device_disabled,
+		device_overrides = device_overrides,
 	}
 end
 
 function M.get_selection(selection_type, files, env, dev)
 	local eval_result = evaluate_device(files, env, dev)
 	return collect_keys(eval_result.selections[selection_type] or {})
+end
+
+function M.device_overrides(files, env, dev)
+	local eval_result = evaluate_device(files, env, dev)
+	return eval_result.device_overrides
 end
 
 return M
