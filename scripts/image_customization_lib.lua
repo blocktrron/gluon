@@ -37,7 +37,7 @@ local function evaluate_device(files, env, dev)
 
 	function funcs.Broken(broken)
 		assert(
-			type(broken) == 'bool',
+			type(broken) == 'boolean',
 			'Incorrect use of Broken(): has to be a boolean value')
 		add_override('broken', broken)
 	end
