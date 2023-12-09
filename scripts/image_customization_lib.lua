@@ -56,7 +56,7 @@ local function evaluate_device(files, env, dev)
 			'Incorrect use of device(): pass a list of device-names as argument')
 
 		for _, device_name in ipairs(device_names) do
-			if device_name == dev.name then
+			if device_name == dev.image then
 				return true
 			end
 		end
