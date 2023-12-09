@@ -89,13 +89,15 @@ end
 local function site_specific_packages(dev_info)
 	local image_custoization = env.GLUON_SITEDIR .. '/image-customization'
 
-	local site_features = {}
 	local site_packages = {}
 	local feature_inherited_pkgs = {}
 
 	if file_exists(image_custoization) then
+		local site_features
+
 		-- First read enabled features from site
-		site_features = compact_list(image_customization_lib.get_selection('feature', {image_custoization}, env, dev_info), false)
+		site_features = image_customization_lib.get_selection('feature', {image_custoization}, env, dev_info)
+		site_features = compact_list(site_features, false)
 
 		-- Create List from packages inherited from features
 		feature_inherited_pkgs = feature_packages(site_features)
