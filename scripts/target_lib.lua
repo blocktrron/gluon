@@ -56,8 +56,9 @@ function F.istrue(v)
 end
 
 local function get_device_overrides(device_info)
+	local image_customization = env.GLUON_SITEDIR .. '/image-customization'
 	local image_customization_lib = dofile('scripts/image_customization_lib.lua')
-	local overrides = image_customization_lib.device_overrides({}, env, device_info)
+	local overrides = image_customization_lib.device_overrides({image_customization}, env, device_info)
 	return overrides
 end
 
