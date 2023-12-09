@@ -46,7 +46,7 @@ local function evaluate_device(files, env, dev)
 		add_override('disabled', true)
 	end
 
-	function funcs.Disavle_Factory()
+	function funcs.DisableFactory()
 		add_override('disable_factory', true)
 	end
 
