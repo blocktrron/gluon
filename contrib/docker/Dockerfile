@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     python3 \
     python3-distutils \
+    python3-elftools \
     python3-setuptools \
     build-essential \
     gawk \
