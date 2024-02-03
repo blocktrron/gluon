@@ -28,6 +28,12 @@ device('extreme-networks-ws-ap3825i', 'extreme-networks_ws-ap3825i', {
 })
 
 
+-- Hewlett Packard
+device('hewlett-packard-msm460', 'hpe_msm460', {
+	factory = false,
+})
+
+
 -- OCEDO
 
 device('ocedo-panda', 'ocedo_panda', {

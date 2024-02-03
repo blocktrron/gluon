@@ -1,0 +1,522 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 7 Dec 2022 00:14:21 +0100
+Subject: mpc85xx: add support for Hewlett Packard MSM460
+
+Hardware
+--------
+CPU:  Freescale P1020 2xe500 PPC
+RAM:  256M DDR3 (Micron MT41J64M16JT-15E:G "D9MNJ")
+NAND: 128M (Micron 2ca1)
+BTN:  1x Reset
+LED:  Power - ETH - Radio1 - Radio2
+UART: RJ-45 Cisco Pinout - 115200 8N1
+
+Installation
+------------
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/target/linux/mpc85xx/base-files/etc/board.d/01_leds b/target/linux/mpc85xx/base-files/etc/board.d/01_leds
+index 7e1d379efe4d515cf3327ee0449b6f04f4831d94..6b4faf76977a1ef327ae949af7f537f7ae41c550 100644
+--- a/target/linux/mpc85xx/base-files/etc/board.d/01_leds
++++ b/target/linux/mpc85xx/base-files/etc/board.d/01_leds
+@@ -16,6 +16,9 @@ extreme-networks,ws-ap3825i)
+ 	ucidef_set_led_netdev "lan1" "LAN1" "green:lan1" "eth1"
+ 	ucidef_set_led_netdev "lan2" "LAN2" "green:lan2" "eth0"
+ 	;;
++hpe,msm460)
++	ucidef_set_led_netdev "lan" "LAN" "green:lan" "eth0"
++	;;
+ esac
+ 
+ board_config_flush
+diff --git a/target/linux/mpc85xx/base-files/etc/board.d/02_network b/target/linux/mpc85xx/base-files/etc/board.d/02_network
+index 41859362b52ed70c023d228325bf6a7eeae58be1..caf00ef414abfb0794c4ce48ea69d5285f72c90e 100644
+--- a/target/linux/mpc85xx/base-files/etc/board.d/02_network
++++ b/target/linux/mpc85xx/base-files/etc/board.d/02_network
+@@ -16,6 +16,9 @@ aerohive,hiveap-330|\
+ enterasys,ws-ap3715i)
+ 	ucidef_set_interfaces_lan_wan "eth1" "eth0"
+ 	;;
++hpe,msm460)
++	ucidef_set_interface_lan "eth0"
++	;;	
+ ocedo,panda)
+ 	ucidef_set_interface_wan "eth1"
+ 	ucidef_add_switch "switch0" \
+diff --git a/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac b/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
+index 20ad8eb44f4735ed72f4db6aee9ae2d289a1d0d5..0e27dfb8ccdaf40e5974e9d14026703ce2b572f6 100644
+--- a/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
++++ b/target/linux/mpc85xx/base-files/etc/hotplug.d/ieee80211/10-fix-wifi-mac
+@@ -20,6 +20,11 @@ enterasys,ws-ap3710i|\
+ extreme-networks,ws-ap3825i)
+ 	mtd_get_mac_ascii cfg2 RADIOADDR${PHYNBR} > /sys${DEVPATH}/macaddress
+ 	;;
++hpe,msm460)
++	wifi_mac=$(mtd_get_mac_binary colubris-bid 0x1f9bd)
++	[ "$PHYNBR" -eq 0 ] && echo "$wifi_mac" > /sys${DEVPATH}/macaddress
++	[ "$PHYNBR" -eq 1 ] && echo "$(macaddr_add $wifi_mac 16)" > /sys${DEVPATH}/macaddress
++	;;
+ ocedo,panda)
+ 	mtd_get_mac_ascii uboot-env0 wmac$(($PHYNBR + 1)) > /sys${DEVPATH}/macaddress
+ 	;;
+diff --git a/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh b/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
+index 226b40a90623e8f3b6b6a59102ab5b0b413dcff3..5d111676ae753ec0cf72c636978e436c6259f658 100755
+--- a/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
++++ b/target/linux/mpc85xx/base-files/lib/upgrade/platform.sh
+@@ -13,6 +13,7 @@ platform_do_upgrade() {
+ 	local board=$(board_name)
+ 
+ 	case "$board" in
++	hpe,msm460|\
+ 	ocedo,panda|\
+ 	sophos,red-15w-rev1|\
+ 	watchguard,firebox-t10)
+diff --git a/target/linux/mpc85xx/files/arch/powerpc/boot/dts/msm460.dts b/target/linux/mpc85xx/files/arch/powerpc/boot/dts/msm460.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5d46072a87a44922f712f70e8d6a073755b4fda0
+--- /dev/null
++++ b/target/linux/mpc85xx/files/arch/powerpc/boot/dts/msm460.dts
+@@ -0,0 +1,230 @@
++// SPDX-License-Identifier: GPL-2.0-or-later or MIT
++
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/include/ "fsl/p1020si-pre.dtsi"
++/ {
++	model = "Hewlett-Packard MSM460";
++	compatible = "hpe,msm460";
++
++	aliases {
++		led-boot = &system_green;
++		led-failsafe = &system_green;
++		led-running = &system_green;
++		led-upgrade = &system_green;
++	};
++
++	chosen {
++		/* Needed for initramfs */
++		bootargs-override = "console=ttyS0,115200 ubi.mtd=5,2048";
++	};
++
++	memory {
++		device_type = "memory";
++	};
++
++	lbc: localbus@ffe05000 {
++		reg = <0 0xffe05000 0 0x1000>;
++		ranges = <0x0 0x0 0x0 0xec000000 0x04000000
++			  0x1 0x0 0x0 0xff800000 0x00040000
++			  0x2 0x0 0x0 0xffa00000 0x00020000
++			  0x3 0x0 0x0 0xffb00000 0x00020000>;
++
++		nand@1,0 {
++			compatible = "fsl,p1020-fcm-nand", "fsl,elbc-fcm-nand";
++			reg = <0x1 0x0 0x40000>;
++
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				partition@0 {
++					reg = <0x0 0xc0000>;
++					label = "u-boot";
++					read-only;
++				};
++
++				partition@c0000 {
++					reg = <0xc0000 0x40000>;
++					label = "colubris-bid";
++					read-only;
++
++					nvmem-layout {
++						compatible = "fixed-layout";
++						#address-cells = <1>;
++						#size-cells = <1>;
++
++						macaddr_hwinfo_1f822: macaddr@1f822 {
++							/* ETH */
++							compatible = "mac-base";
++							reg = <0x1f822 0x6>;
++							#nvmem-cell-cells = <1>;
++						};
++
++						macaddr_hwinfo_1f9bd: macaddr@1f9bd {
++							/* WLAN */
++							compatible = "mac-base";
++							reg = <0x1f9bd 0x6>;
++							#nvmem-cell-cells = <1>;
++						};
++					};
++				};
++
++				/* uenv{0,1} and ubi occupy kernel and slash partitions */
++
++				partition@100000 {
++					reg = <0x100000 0x80000>;
++					label = "uboot-env0";
++				};
++
++				partition@180000 {
++					reg = <0x180000 0x80000>;
++					label = "uboot-env1";
++				};
++
++				partition@200000 {
++					reg = <0x200000 0x300000>;
++					label = "reserved";
++				};
++
++				partition@500000 {
++					reg = <0x500000 0x5f00000>;
++					label = "ubi";
++				};
++
++				partition@6500000 {
++					reg = <0x6500000 0x400000>;
++					label = "pool";
++					read-only;
++				};
++
++				partition@6900000 {
++					reg = <0x6900000 0x15e0000>;
++					label = "flash";
++					read-only;
++				};
++
++				partition@7ee0000 {
++					reg = <0x7ee0000 0x20000>;
++					label = "pf";
++					read-only;
++				};
++
++				/* BBT is at the end of the flash - 100000@7f00000 */
++			};
++		};
++	};
++
++	soc: soc@ffe00000 {
++		ranges = <0x0 0x0 0xffe00000 0x100000>;
++
++		i2c@3000 {
++			status = "disabled";
++		};
++
++		gpio0: gpio-controller@fc00 {
++		};
++
++		mdio@24000 {
++			phy0: ethernet-phy@0 {
++				reg = <0x0>;
++				reset-gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
++				reset-assert-us = <10000>;
++				reset-deassert-us = <10000>;
++			};
++		};
++
++		enet0: ethernet@b0000 {
++			phy-connection-type = "rgmii-id";
++			phy-handle = <&phy0>;
++			nvmem-cells = <&macaddr_hwinfo_1f822 0>;
++			nvmem-cell-names = "mac-address";
++		};
++
++		enet1: ethernet@b1000 {
++			status = "disabled";
++		};
++
++		enet2: ethernet@b2000 {
++			status = "disabled";
++		};
++
++		usb@22000 {
++			status = "disabled";
++		};
++
++		usb@23000 {
++			status = "disabled";
++		};
++	};
++
++	pci0: pcie@ffe09000 {
++		ranges = <0x2000000 0x0 0xa0000000 0 0xa0000000 0x0 0x20000000
++			  0x1000000 0x0 0x00000000 0 0xffc10000 0x0 0x10000>;
++		reg = <0 0xffe09000 0 0x1000>;
++		pcie@0 {
++			ranges = <0x2000000 0x0 0xa0000000
++				  0x2000000 0x0 0xa0000000
++				  0x0 0x20000000
++
++				  0x1000000 0x0 0x0
++				  0x1000000 0x0 0x0
++				  0x0 0x100000>;
++		};
++	};
++
++	pci1: pcie@ffe0a000 {
++		reg = <0 0xffe0a000 0 0x1000>;
++		ranges = <0x2000000 0x0 0x80000000 0 0x80000000 0x0 0x20000000
++			  0x1000000 0x0 0x00000000 0 0xffc00000 0x0 0x10000>;
++		pcie@0 {
++			ranges = <0x2000000 0x0 0x80000000
++				  0x2000000 0x0 0x80000000
++				  0x0 0x20000000
++
++				  0x1000000 0x0 0x0
++				  0x1000000 0x0 0x0
++				  0x0 0x100000>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		system_green: power {
++			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
++			label = "green:power";
++			default-state = "on";
++		};
++
++		lan {
++			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
++			label = "green:lan";
++		};
++
++		radio1 {
++			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
++			label = "green:radio1";
++			linux,default-trigger = "phy0tpt";
++		};
++
++		radio2 {
++			gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
++			label = "green:radio2";
++			linux,default-trigger = "phy1tpt";
++		};
++	};
++
++	buttons {
++		compatible = "gpio-keys";
++
++		reset {
++			label = "reset-btn";
++			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
++			linux,code = <KEY_RESTART>;
++		};
++	};
++};
++/include/ "fsl/p1020si-post.dtsi"
+diff --git a/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/msm460.c b/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/msm460.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..a4f547d3132653817674b3fd8b91e9c7405ff9c7
+--- /dev/null
++++ b/target/linux/mpc85xx/files/arch/powerpc/platforms/85xx/msm460.c
+@@ -0,0 +1,91 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++/*
++ * HPE MSM460 Board Setup
++ *
++ * Copyright (C) 2022 David Bauer <mail@david-bauer.net>
++ *
++ * Based on:
++ *   mpc85xx_rdb.c:
++ *      MPC85xx RDB Board Setup
++ *      Copyright 2013 Freescale Semiconductor Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/stddef.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/of_platform.h>
++
++#include <asm/time.h>
++#include <asm/machdep.h>
++#include <asm/pci-bridge.h>
++#include <mm/mmu_decl.h>
++#include <asm/prom.h>
++#include <asm/udbg.h>
++#include <asm/mpic.h>
++
++#include <sysdev/fsl_soc.h>
++#include <sysdev/fsl_pci.h>
++#include "smp.h"
++
++#include "mpc85xx.h"
++
++void __init msm_pic_init(void)
++{
++	struct mpic *mpic;
++
++	mpic = mpic_alloc(NULL, 0,
++	  MPIC_BIG_ENDIAN |
++	  MPIC_SINGLE_DEST_CPU,
++	  0, 256, " OpenPIC  ");
++
++	BUG_ON(mpic == NULL);
++	mpic_init(mpic);
++}
++
++/*
++ * Setup the architecture
++ */
++static void __init msm_setup_arch(void)
++{
++	if (ppc_md.progress)
++		ppc_md.progress("msm_setup_arch()", 0);
++
++	mpc85xx_smp_init();
++
++	fsl_pci_assign_primary();
++
++	pr_info("MSM460 board from HPE\n");
++}
++
++machine_arch_initcall(msm, mpc85xx_common_publish_devices);
++
++/*
++ * Called very early, device-tree isn't unflattened
++ */
++static int __init msm_probe(void)
++{
++	if (of_machine_is_compatible("hpe,msm460"))
++		return 1;
++	return 0;
++}
++
++define_machine(msm) {
++	.name			= "P1020 RDB",
++	.probe			= msm_probe,
++	.setup_arch		= msm_setup_arch,
++	.init_IRQ		= msm_pic_init,
++#ifdef CONFIG_PCI
++	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
++	.pcibios_fixup_phb      = fsl_pcibios_fixup_phb,
++#endif
++	.get_irq		= mpic_get_irq,
++	.calibrate_decr		= generic_calibrate_decr,
++	.progress		= udbg_progress,
++};
+diff --git a/target/linux/mpc85xx/image/p1020.mk b/target/linux/mpc85xx/image/p1020.mk
+index d3d7f93ddda4b46d7f45651923c5033cd21d68c4..b62165b7b7ff1f333f99e1f8a34f3925fbcc25b3 100644
+--- a/target/linux/mpc85xx/image/p1020.mk
++++ b/target/linux/mpc85xx/image/p1020.mk
+@@ -82,6 +82,21 @@ define Device/extreme-networks_ws-ap3825i
+ endef
+ TARGET_DEVICES += extreme-networks_ws-ap3825i
+ 
++define Device/hpe_msm460
++  DEVICE_VENDOR := Hewlett-Packard
++  DEVICE_MODEL := MSM460
++  KERNEL = kernel-bin | lzma | fit lzma $(KDIR)/image-$$(DEVICE_DTS).dtb
++  BLOCKSIZE := 128k
++  PAGESIZE := 2048
++  SUBPAGESIZE := 2048
++  KERNEL_IN_UBI := 1
++  UBINIZE_OPTS := -E 5
++  IMAGES := factory.bin sysupgrade.bin
++  IMAGE/factory.bin := append-ubi
++  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
++endef
++TARGET_DEVICES += hpe_msm460
++
+ define Device/ocedo_panda
+   DEVICE_VENDOR := OCEDO
+   DEVICE_MODEL := Panda
+@@ -95,4 +110,3 @@ define Device/ocedo_panda
+   IMAGE/fdt.bin := append-dtb
+ endef
+ TARGET_DEVICES += ocedo_panda
+-
+diff --git a/target/linux/mpc85xx/p1020/config-default b/target/linux/mpc85xx/p1020/config-default
+index 573ff362f956a5aea747591a1a0a8a1339c443c0..d1c053258225e7058bb20bafa62702a400c05306 100644
+--- a/target/linux/mpc85xx/p1020/config-default
++++ b/target/linux/mpc85xx/p1020/config-default
+@@ -12,6 +12,7 @@ CONFIG_GPIO_74X164=y
+ CONFIG_HAVE_RCU_TABLE_FREE=y
+ CONFIG_HIVEAP_330=y
+ CONFIG_PANDA=y
++CONFIG_MSM460=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_LEDS_LP5521=y
+ CONFIG_LEDS_LP55XX_COMMON=y
+diff --git a/target/linux/mpc85xx/patches-5.10/108-powerpc-85xx-hpe-msm-support.patch b/target/linux/mpc85xx/patches-5.10/108-powerpc-85xx-hpe-msm-support.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f66daf62d89cd8ace71b2d2e4716f3fd0e0bc1b
+--- /dev/null
++++ b/target/linux/mpc85xx/patches-5.10/108-powerpc-85xx-hpe-msm-support.patch
+@@ -0,0 +1,30 @@
++--- a/arch/powerpc/platforms/85xx/Kconfig
+++++ b/arch/powerpc/platforms/85xx/Kconfig
++@@ -92,6 +92,17 @@ config WS_AP3825I
++ 	  This board is a Concurrent Dual-Band wireless access point with a
++ 	  Freescale P1020 SoC.
++ 
+++config MSM460
+++	bool "HPE MSM460"
+++	select DEFAULT_UIMAGE
+++	select ARCH_REQUIRE_GPIOLIB
+++	select GPIO_MPC8XXX
+++	help
+++	  This option enables support for the HPE MSM460 board.
+++
+++	  This board is a Concurrent Dual-Band wireless access point with a
+++	  Freescale P1020 SoC.
+++
++ config MPC8540_ADS
++ 	bool "Freescale MPC8540 ADS"
++ 	select DEFAULT_UIMAGE
++--- a/arch/powerpc/platforms/85xx/Makefile
+++++ b/arch/powerpc/platforms/85xx/Makefile
++@@ -28,6 +28,7 @@ obj-$(CONFIG_PANDA)       += panda.o
++ obj-$(CONFIG_TWR_P102x)   += twr_p102x.o
++ obj-$(CONFIG_WS_AP3710I)  += ws-ap3710i.o
++ obj-$(CONFIG_WS_AP3825I)  += ws-ap3825i.o
+++obj-$(CONFIG_MSM460)  += msm460.o
++ obj-$(CONFIG_CORENET_GENERIC)   += corenet_generic.o
++ obj-$(CONFIG_FB_FSL_DIU)	+= t1042rdb_diu.o
++ obj-$(CONFIG_RED_15W_REV1)	+= red15w_rev1.o
+diff --git a/target/linux/mpc85xx/patches-5.15/108-powerpc-85xx-hpe-msm-support.patch b/target/linux/mpc85xx/patches-5.15/108-powerpc-85xx-hpe-msm-support.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8201fbc768b74dd6ab57912fdc60ea1f7c6dcb58
+--- /dev/null
++++ b/target/linux/mpc85xx/patches-5.15/108-powerpc-85xx-hpe-msm-support.patch
+@@ -0,0 +1,30 @@
++--- a/arch/powerpc/platforms/85xx/Kconfig
+++++ b/arch/powerpc/platforms/85xx/Kconfig
++@@ -102,6 +102,17 @@ config FIREBOX_T10
++ 	  This board is a VPN Gateway-Router with a
++ 	  Freescale P1010 SoC.
++ 
+++config MSM460
+++	bool "HPE MSM460"
+++	select DEFAULT_UIMAGE
+++	select ARCH_REQUIRE_GPIOLIB
+++	select GPIO_MPC8XXX
+++	help
+++	  This option enables support for the HPE MSM460 board.
+++
+++	  This board is a Concurrent Dual-Band wireless access point with a
+++	  Freescale P1020 SoC.
+++
++ config MPC8540_ADS
++ 	bool "Freescale MPC8540 ADS"
++ 	select DEFAULT_UIMAGE
++--- a/arch/powerpc/platforms/85xx/Makefile
+++++ b/arch/powerpc/platforms/85xx/Makefile
++@@ -25,6 +25,7 @@ obj-$(CONFIG_P1022_DS)    += p1022_ds.o
++ obj-$(CONFIG_P1022_RDK)   += p1022_rdk.o
++ obj-$(CONFIG_P1023_RDB)   += p1023_rdb.o
++ obj-$(CONFIG_PANDA)       += panda.o
+++obj-$(CONFIG_MSM460)      += msm460.o
++ obj-$(CONFIG_TWR_P102x)   += twr_p102x.o
++ obj-$(CONFIG_WS_AP3710I)  += ws-ap3710i.o
++ obj-$(CONFIG_WS_AP3825I)  += ws-ap3825i.o
