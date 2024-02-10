@@ -14,11 +14,11 @@ Signed-off-by: David Bauer <mail@david-bauer.net>
 
 diff --git a/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..e7e21f4b90a5d0da244ba72f0de85b3e97af5612
+index 0000000000000000000000000000000000000000..ee10ae9b3e2d0b78e6a242d1bdaff7b43a3b2f44
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
-@@ -0,0 +1,96 @@
-+From bd3955c1aef3137a5930ecb46e3d7eb3416c14e8 Mon Sep 17 00:00:00 2001
+@@ -0,0 +1,97 @@
++From 43eee69d8593c9cb0c41191bd79958ffbbfee183 Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Thu, 8 Feb 2024 15:51:03 +0100
 +Subject: [PATCH] mt76 mt7915: lock TXQ when altering block-ack settings
@@ -33,14 +33,14 @@ index 0000000000000000000000000000000000000000..e7e21f4b90a5d0da244ba72f0de85b3e
 +
 +Signed-off-by: David Bauer <mail@david-bauer.net>
 +---
-+ mt7915/mcu.c | 48 ++++++++++++++++++++++++++++++++++++++----------
-+ 1 file changed, 38 insertions(+), 10 deletions(-)
++ mt7915/mcu.c | 49 +++++++++++++++++++++++++++++++++++++++----------
++ 1 file changed, 39 insertions(+), 10 deletions(-)
 +
 +diff --git a/mt7915/mcu.c b/mt7915/mcu.c
-+index 8224f8be..2bbf98da 100644
++index 8224f8be..18a94fe1 100644
 +--- a/mt7915/mcu.c
 ++++ b/mt7915/mcu.c
-+@@ -681,32 +681,60 @@ out:
++@@ -681,32 +681,61 @@ out:
 + 				     MCU_EXT_CMD(BSS_INFO_UPDATE), true);
 + }
 + 
@@ -56,24 +56,25 @@ index 0000000000000000000000000000000000000000..e7e21f4b90a5d0da244ba72f0de85b3e
 ++	struct mt76_phy *ext_phy = dev->mt76.phys[MT_BAND1];
 ++	int ret;
 ++
-++	pr_warn("Scheduling all pending txq queued=%d ndesc=%d\n", q->queued, q->ndesc);
+++//	pr_warn("Scheduling all pending txq queued=%d ndesc=%d\n", q->queued, q->ndesc);
 ++	/* Schedule pending TX */
 ++	mt76_txq_schedule_all(pri_phy);
 ++	if (ext_phy)
 ++		mt76_txq_schedule_all(ext_phy);
 ++	/* Disable TX worker */
-++	pr_warn("Scheduling all pending txq queued=%d ndesc=%d\n", q->queued, q->ndesc);
+++//	pr_warn("Scheduling all pending txq queued=%d ndesc=%d\n", q->queued, q->ndesc);
 ++
 ++	mt76_worker_disable(&dev->mt76.tx_worker);
 ++
-++	pr_warn("Disabled tx worker queued=%d ndesc=%d\n", q->queued, q->ndesc);
+++//	pr_warn("Disabled tx worker queued=%d ndesc=%d\n", q->queued, q->ndesc);
+++	mt76_queue_tx_cleanup(dev, q, true);
 ++
 ++	ret = mt76_connac_mcu_sta_ba(&dev->mt76, &mvif->mt76, params,
 ++				      MCU_EXT_CMD(STA_REC_UPDATE),
 ++				      enable, tx);
-++	pr_warn("Sent BA update queued=%d ndesc=%d\n", q->queued, q->ndesc);
+++//	pr_warn("Sent BA update queued=%d ndesc=%d\n", q->queued, q->ndesc);
 ++	mt76_worker_enable(&dev->mt76.tx_worker);
-++	pr_warn("Enabled tx worker queued=%d ndesc=%d\n", q->queued, q->ndesc);
+++//	pr_warn("Enabled tx worker queued=%d ndesc=%d\n", q->queued, q->ndesc);
 ++
 ++	tasklet_schedule(&dev->mt76.irq_tasklet);
 ++
