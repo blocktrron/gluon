@@ -1,8 +1,8 @@
 GLUON_FEEDS='gluon packages routing'
 
-OPENWRT_REPO=https://github.com/openwrt/openwrt.git
-OPENWRT_BRANCH=master
-OPENWRT_COMMIT=114190d8ae61fb3a7671852fbd7f0ca3279a5625
+OPENWRT_REPO=https://github.com/blocktrron/openwrt.git
+OPENWRT_BRANCH=dangowrt-bpi-r4
+OPENWRT_COMMIT=35a225ca51a491d2416734896136badb87f22858
 
 PACKAGES_GLUON_REPO=https://github.com/freifunk-gluon/packages.git
 PACKAGES_GLUON_COMMIT=53ea3b89771fc7d7a80f1800ce25e98dfe1633aa
