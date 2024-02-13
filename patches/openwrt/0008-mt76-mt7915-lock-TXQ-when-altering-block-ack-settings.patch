@@ -14,11 +14,11 @@ Signed-off-by: David Bauer <mail@david-bauer.net>
 
 diff --git a/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..5853c8ad81c6721fa77b27e6995fc8f9f0635758
+index 0000000000000000000000000000000000000000..4fd43f36be38156353c7d42a142dcdf3e2359d3a
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
-@@ -0,0 +1,113 @@
-+From b0a09fa5ddabbb68d9d90a9d8f3bfc51e74aa629 Mon Sep 17 00:00:00 2001
+@@ -0,0 +1,108 @@
++From 6ff7f40d2efcc0135c0b0d652feb7d31cdee9ade Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Thu, 8 Feb 2024 15:51:03 +0100
 +Subject: [PATCH] mt76 mt7915: lock TXQ when altering block-ack settings
@@ -33,14 +33,14 @@ index 0000000000000000000000000000000000000000..5853c8ad81c6721fa77b27e6995fc8f9
 +
 +Signed-off-by: David Bauer <mail@david-bauer.net>
 +---
-+ mt7915/mcu.c | 65 ++++++++++++++++++++++++++++++++++++++++++++--------
-+ 1 file changed, 55 insertions(+), 10 deletions(-)
++ mt7915/mcu.c | 60 +++++++++++++++++++++++++++++++++++++++++++---------
++ 1 file changed, 50 insertions(+), 10 deletions(-)
 +
 +diff --git a/mt7915/mcu.c b/mt7915/mcu.c
-+index 8224f8be..49d82736 100644
++index 8224f8be..630006d1 100644
 +--- a/mt7915/mcu.c
 ++++ b/mt7915/mcu.c
-+@@ -681,32 +681,77 @@ out:
++@@ -681,32 +681,72 @@ out:
 + 				     MCU_EXT_CMD(BSS_INFO_UPDATE), true);
 + }
 + 
@@ -64,10 +64,6 @@ index 0000000000000000000000000000000000000000..5853c8ad81c6721fa77b27e6995fc8f9
 ++		mt76_txq_schedule_all(ext_phy);
 ++
 ++	mt76_worker_disable(&dev->mt76.tx_worker);
-++	mt76_for_each_q_rx(mdev, i) {
-++		if (mdev->q_rx[i].ndesc)
-++			napi_disable(&dev->mt76.napi[i]);
-++	}
 ++	napi_disable(&dev->mt76.tx_napi);
 ++
 ++	/* Clean TXQ */
@@ -80,7 +76,6 @@ index 0000000000000000000000000000000000000000..5853c8ad81c6721fa77b27e6995fc8f9
 ++	local_bh_disable();
 ++	mt76_for_each_q_rx(mdev, i) {
 ++		if (mdev->q_rx[i].ndesc) {
-++			napi_enable(&dev->mt76.napi[i]);
 ++			napi_schedule(&dev->mt76.napi[i]);
 ++		}
 ++	}
