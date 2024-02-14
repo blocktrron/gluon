@@ -14,11 +14,11 @@ Signed-off-by: David Bauer <mail@david-bauer.net>
 
 diff --git a/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..4fd43f36be38156353c7d42a142dcdf3e2359d3a
+index 0000000000000000000000000000000000000000..6ac145911560763f671497ed9ea3d547fc0c7782
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
-@@ -0,0 +1,108 @@
-+From 6ff7f40d2efcc0135c0b0d652feb7d31cdee9ade Mon Sep 17 00:00:00 2001
+@@ -0,0 +1,115 @@
++From f8e2c150e5bd61a70ca9aa6d912fa7e164af8e00 Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Thu, 8 Feb 2024 15:51:03 +0100
 +Subject: [PATCH] mt76 mt7915: lock TXQ when altering block-ack settings
@@ -33,14 +33,14 @@ index 0000000000000000000000000000000000000000..4fd43f36be38156353c7d42a142dcdf3
 +
 +Signed-off-by: David Bauer <mail@david-bauer.net>
 +---
-+ mt7915/mcu.c | 60 +++++++++++++++++++++++++++++++++++++++++++---------
-+ 1 file changed, 50 insertions(+), 10 deletions(-)
++ mt7915/mcu.c | 67 ++++++++++++++++++++++++++++++++++++++++++++--------
++ 1 file changed, 57 insertions(+), 10 deletions(-)
 +
 +diff --git a/mt7915/mcu.c b/mt7915/mcu.c
-+index 8224f8be..630006d1 100644
++index 8224f8be..9ffbbe6c 100644
 +--- a/mt7915/mcu.c
 ++++ b/mt7915/mcu.c
-+@@ -681,32 +681,72 @@ out:
++@@ -681,32 +681,79 @@ out:
 + 				     MCU_EXT_CMD(BSS_INFO_UPDATE), true);
 + }
 + 
@@ -58,16 +58,23 @@ index 0000000000000000000000000000000000000000..4fd43f36be38156353c7d42a142dcdf3
 ++	int ret;
 ++	int i;
 ++
+++	mt76_worker_disable(&dev->mt76.tx_worker);
+++	napi_disable(&dev->mt76.tx_napi);
+++
 ++	/* Schedule pending TX */
 ++	mt76_txq_schedule_all(pri_phy);
 ++	if (ext_phy)
 ++		mt76_txq_schedule_all(ext_phy);
 ++
-++	mt76_worker_disable(&dev->mt76.tx_worker);
-++	napi_disable(&dev->mt76.tx_napi);
-++
 ++	/* Clean TXQ */
-++	mt76_queue_tx_cleanup(dev, q, true);
+++	// mt76_queue_tx_cleanup(dev, q, true);
+++	i = 0;
+++	while (q->queued > 0 && i < 100) {
+++		mt76_worker_schedule(&dev->mt76.tx_worker);
+++		dev_warn(dev->mt76.dev, "TXQ is not empty, wait for 100ms iteration %d\n", i);
+++		usleep_range(1000, 10000);
+++		i++;
+++	}
 ++
 ++	ret = mt76_connac_mcu_sta_ba(&dev->mt76, &mvif->mt76, params,
 ++				      MCU_EXT_CMD(STA_REC_UPDATE),
