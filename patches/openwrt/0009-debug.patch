@@ -1,0 +1,67 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 15 Feb 2024 10:22:53 +0100
+Subject: debug
+
+diff --git a/package/kernel/mt76/patches/0001-debug.patch b/package/kernel/mt76/patches/0001-debug.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe403599401a5cba6f680291cd4e7d76330afadd
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-debug.patch
+@@ -0,0 +1,57 @@
++From c0a2fa4c1c177d5ef575498d3b26014b1f83c372 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Thu, 15 Feb 2024 10:22:18 +0100
++Subject: [PATCH] debug
++
++---
++ dma.c | 3 +++
++ mcu.c | 5 ++++-
++ 2 files changed, 7 insertions(+), 1 deletion(-)
++
++diff --git a/dma.c b/dma.c
++index 05d9ab3c..03c41c6c 100644
++--- a/dma.c
+++++ b/dma.c
++@@ -481,6 +481,7 @@ mt76_dma_tx_queue_skb_raw(struct mt76_dev *dev, struct mt76_queue *q,
++ 	buf.len = skb->len;
++ 
++ 	spin_lock_bh(&q->lock);
+++	dev_warn(dev->dev, "queue_raw tx_info: 0x%08x\n", tx_info);
++ 	mt76_dma_add_buf(dev, q, &buf, 1, tx_info, skb, NULL);
++ 	mt76_dma_kick_queue(dev, q);
++ 	spin_unlock_bh(&q->lock);
++@@ -559,6 +560,8 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, struct mt76_queue *q,
++ 				   DMA_TO_DEVICE);
++ 	if (ret < 0)
++ 		goto unmap;
+++	
+++	dev_warn(dev->dev, "queue_skb tx_info: 0x%08x\n", tx_info.info);
++ 
++ 	return mt76_dma_add_buf(dev, q, tx_info.buf, tx_info.nbuf,
++ 				tx_info.info, tx_info.skb, t);
++diff --git a/mcu.c b/mcu.c
++index a8cafa39..ed84313f 100644
++--- a/mcu.c
+++++ b/mcu.c
++@@ -81,6 +81,9 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
++ 
++ 	mutex_lock(&dev->mcu.mutex);
++ 
+++	dev_warn(dev->dev, "mcu message: cmd=0x%x, data_len=%d wait_resp=%d\n",
+++		 cmd, skb->len, wait_resp);
+++
++ 	ret = dev->mcu_ops->mcu_skb_send_msg(dev, skb, cmd, &seq);
++ 	if (ret < 0)
++ 		goto out;
++@@ -100,7 +103,7 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
++ 		else
++ 			dev_kfree_skb(skb);
++ 	} while (ret == -EAGAIN);
++-
+++	dev_warn(dev->dev, "mcu message: cmd=0x%x response\n", cmd);
++ out:
++ 	mutex_unlock(&dev->mcu.mutex);
++ 
++-- 
++2.43.0
++
