@@ -14,11 +14,11 @@ Signed-off-by: David Bauer <mail@david-bauer.net>
 
 diff --git a/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..b6297635381a748fabfd4bb8414c69f933d85783
+index 0000000000000000000000000000000000000000..ca6118677c9f15f8e0f2a9208e51e672fcf6eec3
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0001-mt76-mt7915-lock-TXQ-when-altering-block-ack-setting.patch
-@@ -0,0 +1,178 @@
-+From 1ea9f9299496e50860ee025466958871408cf571 Mon Sep 17 00:00:00 2001
+@@ -0,0 +1,117 @@
++From d6c638ad3db0cf60a896d6774f1f01715ccde84e Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Thu, 8 Feb 2024 15:51:03 +0100
 +Subject: [PATCH] mt76 mt7915: lock TXQ when altering block-ack settings
@@ -33,80 +33,21 @@ index 0000000000000000000000000000000000000000..b6297635381a748fabfd4bb8414c69f9
 +
 +Signed-off-by: David Bauer <mail@david-bauer.net>
 +---
-+ mt7915/mcu.c | 132 ++++++++++++++++++++++++++++++++++++++++++++++++++-
-+ 1 file changed, 131 insertions(+), 1 deletion(-)
++ mt7915/mcu.c | 71 +++++++++++++++++++++++++++++++++++++++++++++++++++-
++ 1 file changed, 70 insertions(+), 1 deletion(-)
 +
 +diff --git a/mt7915/mcu.c b/mt7915/mcu.c
-+index 8224f8be..79923e0f 100644
++index 8224f8be..2d00c908 100644
 +--- a/mt7915/mcu.c
 ++++ b/mt7915/mcu.c
-+@@ -185,6 +185,130 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
++@@ -185,6 +185,69 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 + 	return ret;
 + }
 + 
-++static int mt7915_mcu_add_ba(struct mt7915_dev *dev,
-++			     struct ieee80211_ampdu_params *params,
-++			     bool enable,
-++			     bool tx)
-++{
-++	struct mt7915_sta *msta = (struct mt7915_sta *)params->sta->drv_priv;
-++	struct mt76_dev *mdev = &dev->mt76;
-++	struct mt7915_vif *mvif = msta->vif;
-++	struct mt76_queue *q = mvif->phy->mt76->q_tx[MT_TXQ_BE];
-++	struct mt76_phy *pri_phy = dev->mt76.phys[MT_BAND0];
-++	struct mt76_phy *ext_phy = dev->mt76.phys[MT_BAND1];
-++	int ret;
-++	int i;
-++
-++	mt76_worker_disable(&dev->mt76.tx_worker);
-++	napi_disable(&dev->mt76.tx_napi);
-++
-++	/* Schedule pending TX */
-++	mt76_txq_schedule_all(pri_phy);
-++	if (ext_phy)
-++		mt76_txq_schedule_all(ext_phy);
-++
-++	/* Wait for clean TXQ - Max 5 seconds */
-++	i = 0;
-++	while (q->queued > 0 && i < 5000) {
-++		mt76_worker_schedule(&dev->mt76.tx_worker);
-++		msleep(1);
-++		i++;
-++	}
-++	if (i > 0) {
-++		dev_warn(dev->mt76.dev, "Waited for empty TXQ iteration=%d queued=%d\n",
-++			i, q->queued);
-++	}
-++
-++	ret = mt76_connac_mcu_sta_ba(&dev->mt76, &mvif->mt76, params,
-++				      MCU_EXT_CMD(STA_REC_UPDATE),
-++				      enable, tx);
-++
-++	local_bh_disable();
-++	mt76_for_each_q_rx(mdev, i) {
-++		if (mdev->q_rx[i].ndesc) {
-++			napi_schedule(&dev->mt76.napi[i]);
-++		}
-++	}
-++	local_bh_enable();
-++
-++	local_bh_disable();
-++	napi_enable(&dev->mt76.tx_napi);
-++	napi_schedule(&dev->mt76.tx_napi);
-++	local_bh_enable();
-++
-++	mt76_worker_enable(&dev->mt76.tx_worker);
-++	tasklet_schedule(&dev->mt76.irq_tasklet);
-++
-++	return ret;
-++}
-++
 ++static int mt7915_mcu_pause_tx(struct mt76_dev *mdev)
 ++{
 ++	struct mt7915_dev *dev = container_of(mdev, struct mt7915_dev, mt76);
 ++	struct mt76_phy *phy = dev->mt76.phys[MT_BAND0];
-++	struct mt76_phy *pri_phy = dev->mt76.phys[MT_BAND0];
-++	struct mt76_phy *ext_phy = dev->mt76.phys[MT_BAND1];
 ++	struct mt76_queue *q;
 ++	int band;
 ++	int i;
@@ -145,8 +86,6 @@ index 0000000000000000000000000000000000000000..b6297635381a748fabfd4bb8414c69f9
 ++static int mt7915_mcu_resume_tx(struct mt76_dev *mdev)
 ++{
 ++	struct mt7915_dev *dev = container_of(mdev, struct mt7915_dev, mt76);
-++	struct mt76_phy *pri_phy = dev->mt76.phys[MT_BAND0];
-++	struct mt76_phy *ext_phy = dev->mt76.phys[MT_BAND1];
 ++	int i;
 ++
 ++	local_bh_disable();
@@ -171,7 +110,7 @@ index 0000000000000000000000000000000000000000..b6297635381a748fabfd4bb8414c69f9
 + static int
 + mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
 + 			int cmd, int *wait_seq)
-+@@ -193,6 +317,8 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
++@@ -193,6 +256,8 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
 + 	enum mt76_mcuq_id qid;
 + 	int ret;
 + 
@@ -180,7 +119,7 @@ index 0000000000000000000000000000000000000000..b6297635381a748fabfd4bb8414c69f9
 + 	ret = mt76_connac2_mcu_fill_message(mdev, skb, cmd, wait_seq);
 + 	if (ret)
 + 		return ret;
-+@@ -204,7 +330,11 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
++@@ -204,7 +269,11 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
 + 	else
 + 		qid = MT_MCUQ_WM;
 + 
