@@ -4,22 +4,24 @@ Subject: debug
 
 diff --git a/package/kernel/mt76/patches/0001-debug.patch b/package/kernel/mt76/patches/0001-debug.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..fe403599401a5cba6f680291cd4e7d76330afadd
+index 0000000000000000000000000000000000000000..955a3bf050b6efcee4ef4d76303b339a37fc1927
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0001-debug.patch
-@@ -0,0 +1,57 @@
-+From c0a2fa4c1c177d5ef575498d3b26014b1f83c372 Mon Sep 17 00:00:00 2001
+@@ -0,0 +1,112 @@
++From fdd908d4eead603c2fae383ed69a629747fb67eb Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Thu, 15 Feb 2024 10:22:18 +0100
 +Subject: [PATCH] debug
 +
 +---
-+ dma.c | 3 +++
-+ mcu.c | 5 ++++-
-+ 2 files changed, 7 insertions(+), 1 deletion(-)
++ dma.c        | 6 ++++++
++ mcu.c        | 5 ++++-
++ mt76.h       | 1 +
++ mt7915/mcu.c | 6 ++++++
++ 4 files changed, 17 insertions(+), 1 deletion(-)
 +
 +diff --git a/dma.c b/dma.c
-+index 05d9ab3c..03c41c6c 100644
++index 05d9ab3c..925df8f6 100644
 +--- a/dma.c
 ++++ b/dma.c
 +@@ -481,6 +481,7 @@ mt76_dma_tx_queue_skb_raw(struct mt76_dev *dev, struct mt76_queue *q,
@@ -30,7 +32,16 @@ index 0000000000000000000000000000000000000000..fe403599401a5cba6f680291cd4e7d76
 + 	mt76_dma_add_buf(dev, q, &buf, 1, tx_info, skb, NULL);
 + 	mt76_dma_kick_queue(dev, q);
 + 	spin_unlock_bh(&q->lock);
-+@@ -559,6 +560,8 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, struct mt76_queue *q,
++@@ -513,6 +514,8 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, struct mt76_queue *q,
++ 	if (test_bit(MT76_RESET, &dev->phy.state))
++ 		goto free_skb;
++ 
+++	spin_lock(&dev->tx_lock);
+++
++ 	t = mt76_get_txwi(dev);
++ 	if (!t)
++ 		goto free_skb;
++@@ -559,6 +562,8 @@ mt76_dma_tx_queue_skb(struct mt76_dev *dev, struct mt76_queue *q,
 + 				   DMA_TO_DEVICE);
 + 	if (ret < 0)
 + 		goto unmap;
@@ -39,6 +50,14 @@ index 0000000000000000000000000000000000000000..fe403599401a5cba6f680291cd4e7d76
 + 
 + 	return mt76_dma_add_buf(dev, q, tx_info.buf, tx_info.nbuf,
 + 				tx_info.info, tx_info.skb, t);
++@@ -582,6 +587,7 @@ free:
++ 	mt76_put_txwi(dev, t);
++ 
++ free_skb:
+++	spin_unlock(&dev->tx_lock);
++ 	status.skb = tx_info.skb;
++ 	hw = mt76_tx_status_get_hw(dev, tx_info.skb);
++ 	spin_lock_bh(&dev->rx_lock);
 +diff --git a/mcu.c b/mcu.c
 +index a8cafa39..ed84313f 100644
 +--- a/mcu.c
@@ -61,6 +80,42 @@ index 0000000000000000000000000000000000000000..fe403599401a5cba6f680291cd4e7d76
 ++	dev_warn(dev->dev, "mcu message: cmd=0x%x response\n", cmd);
 + out:
 + 	mutex_unlock(&dev->mcu.mutex);
++ 
++diff --git a/mt76.h b/mt76.h
++index fd527649..8e3cf2de 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -787,6 +787,7 @@ struct mt76_dev {
++ 	struct net_device napi_dev;
++ 	struct net_device tx_napi_dev;
++ 	spinlock_t rx_lock;
+++	spinlock_t tx_lock;
++ 	struct napi_struct napi[__MT_RXQ_MAX];
++ 	struct sk_buff_head rx_skb[__MT_RXQ_MAX];
++ 	struct tasklet_struct irq_tasklet;
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 2d00c908..f66e5e5f 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -256,6 +256,9 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
++ 	enum mt76_mcuq_id qid;
++ 	int ret;
++ 
+++	/* Lock TX actions */
+++	spin_lock(&dev->mt76.tx_lock);
+++
++ 	mt7915_mcu_pause_tx(mdev);
++ 
++ 	ret = mt76_connac2_mcu_fill_message(mdev, skb, cmd, wait_seq);
++@@ -273,6 +276,9 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
++ 
++ 	mt7915_mcu_resume_tx(mdev);
++ 
+++	/* Unlock TX actions */
+++	spin_unlock(&dev->mt76.tx_lock);
+++
++ 	return ret;
++ }
 + 
 +-- 
 +2.43.0
