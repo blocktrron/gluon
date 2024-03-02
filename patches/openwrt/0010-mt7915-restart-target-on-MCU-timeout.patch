@@ -1,0 +1,125 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 2 Mar 2024 23:22:13 +0100
+Subject: mt7915: restart target on MCU timeout
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/kernel/mt76/patches/100-mt7915-trigger-reset-upon-MCU-timeout.patch b/package/kernel/mt76/patches/100-mt7915-trigger-reset-upon-MCU-timeout.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ea14b3ed5a2e173c4188bce8b66b64777705490d
+--- /dev/null
++++ b/package/kernel/mt76/patches/100-mt7915-trigger-reset-upon-MCU-timeout.patch
+@@ -0,0 +1,113 @@
++From e2e2d0ac0b8c5b0e3a52220a666f5d10a4b424b2 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 2 Mar 2024 21:23:06 +0100
++Subject: [PATCH] mt7915: trigger reset upon MCU timeout
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mcu.c    | 26 +++++++++++++++++++++++++-
++ mt7915/mmio.c   |  2 ++
++ mt7915/mt7915.h |  2 ++
++ 3 files changed, 29 insertions(+), 1 deletion(-)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 8224f8be..6f1083b8 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -157,13 +157,25 @@ static int
++ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
++ 			  struct sk_buff *skb, int seq)
++ {
+++	struct mt7915_dev *dev = container_of(mdev, struct mt7915_dev, mt76);
++ 	struct mt76_connac2_mcu_rxd *rxd;
++ 	int ret = 0;
++ 
++ 	if (!skb) {
++ 		dev_err(mdev->dev, "Message %08x (seq %d) timeout\n",
++ 			cmd, seq);
+++		if (dev->mcu_timeout < 10) {
+++			dev->mcu_timeout++;
+++		} else {
+++			dev->recovery.state |= MT_MCU_CMD_WDT_MASK;
+++			dev->mcu_timeout = 0;
+++			mt7915_reset(dev);
+++		}
++ 		return -ETIMEDOUT;
+++	} else {
+++		dev->mcu_timeout = 0;
+++		dev_err(mdev->dev, "Message %08x (seq %d) recv\n",
+++			cmd, seq);
++ 	}
++ 
++ 	rxd = (struct mt76_connac2_mcu_rxd *)skb->data;
++@@ -193,6 +205,11 @@ mt7915_mcu_send_message(struct mt76_dev *mdev, struct sk_buff *skb,
++ 	enum mt76_mcuq_id qid;
++ 	int ret;
++ 
+++	/* Check if restart is pending */
+++	if (dev->recovery.restart) {
+++		dev_err(mdev->dev, "Message %08x sent during restart\n", cmd);
+++	}
+++
++ 	ret = mt76_connac2_mcu_fill_message(mdev, skb, cmd, wait_seq);
++ 	if (ret)
++ 		return ret;
++@@ -2303,6 +2320,7 @@ static int mt7915_mcu_set_red(struct mt7915_dev *dev, bool enabled)
++ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
++ {
++ 	int ret;
+++	int i;
++ 
++ 	/* force firmware operation mode into normal state,
++ 	 * which should be set before firmware download stage.
++@@ -2319,7 +2337,13 @@ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
++ 			return ret;
++ 	}
++ 
++-	ret = mt7915_load_firmware(dev);
+++	for (i = 0; i < 10; i++) {
+++		ret = mt7915_load_firmware(dev);
+++		if (!ret)
+++			break;
+++		msleep(500);
+++	}
+++
++ 	if (ret)
++ 		return ret;
++ 
++diff --git a/mt7915/mmio.c b/mt7915/mmio.c
++index fc7ace63..90e628dd 100644
++--- a/mt7915/mmio.c
+++++ b/mt7915/mmio.c
++@@ -892,6 +892,7 @@ static void mt7915_rx_poll_complete(struct mt76_dev *mdev,
++ static void mt7915_irq_tasklet(struct tasklet_struct *t)
++ {
++ 	struct mt7915_dev *dev = from_tasklet(dev, t, mt76.irq_tasklet);
+++	struct mt76_dev *mdev = &dev->mt76;
++ 	struct mtk_wed_device *wed = &dev->mt76.mmio.wed;
++ 	u32 intr, intr1, mask;
++ 
++@@ -953,6 +954,7 @@ static void mt7915_irq_tasklet(struct tasklet_struct *t)
++ 
++ 		mt76_wr(dev, MT_MCU_CMD, val);
++ 		if (val & (MT_MCU_CMD_ERROR_MASK | MT_MCU_CMD_WDT_MASK)) {
+++			dev_warn(mdev->dev, "Detected MCU Error\n");
++ 			dev->recovery.state = val;
++ 			mt7915_reset(dev);
++ 		}
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index 795c3e6f..16ad6d12 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -316,6 +316,8 @@ struct mt7915_dev {
++ 	struct reset_control *rstc;
++ 	void __iomem *dcm;
++ 	void __iomem *sku;
+++
+++	u8 mcu_timeout;
++ };
++ 
++ enum {
++-- 
++2.43.0
++
