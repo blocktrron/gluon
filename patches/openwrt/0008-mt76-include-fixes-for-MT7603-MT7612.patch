@@ -1,0 +1,353 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 7 Mar 2024 17:26:41 +0100
+Subject: mt76: include fixes for MT7603 / MT7612
+
+diff --git a/package/kernel/mt76/patches/0001-tx-add-limit-for-TXS-ack-override.patch b/package/kernel/mt76/patches/0001-tx-add-limit-for-TXS-ack-override.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..1d94207e35e10f7480ac5d8ea3230a4d0c1d1f9d
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-tx-add-limit-for-TXS-ack-override.patch
+@@ -0,0 +1,80 @@
++From cdcfa5e7e29375b43e4627486931852b685adf54 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 1 Mar 2024 17:41:33 +0100
++Subject: [PATCH 1/4] tx: add limit for TXS ack override
++
++Add an upper limit for overriding missing TX status for each client.
++
++This avoids clients, which to mac80211 still appear as if they are
++connected when in fact they are not reachable for the AP anymore.
++
++This can happen, as the radio (observed on MT7603 in particular) might
++skip TX status-reporting which the host will then mark as acked. This
++prevents the client from timing out and become "sticky" on the AP.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt76.h |  2 ++
++ tx.c   | 23 ++++++++++++++++++++---
++ 2 files changed, 22 insertions(+), 3 deletions(-)
++
++diff --git a/mt76.h b/mt76.h
++index fd527649..6d9b7028 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -330,6 +330,8 @@ struct mt76_wcid {
++ 	u8 rx_key_pn[IEEE80211_NUM_TIDS + 1][6];
++ 	u16 cipher;
++ 
+++	u8 txs_failed_cnt;
+++
++ 	u32 tx_info;
++ 	bool sw_iv;
++ 
++diff --git a/tx.c b/tx.c
++index 1809b032..760cf6fb 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -91,6 +91,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ {
++ 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
++ 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
+++	struct mt76_wcid *wcid;
++ 	u8 done = MT_TX_CB_DMA_DONE | MT_TX_CB_TXS_DONE;
++ 
++ 	flags |= cb->flags;
++@@ -98,12 +99,28 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 
++ 	if ((flags & done) != done)
++ 		return;
+++	
+++	wcid = rcu_dereference(dev->wcid[cb->wcid]);
++ 
++ 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
++ 	if (flags & MT_TX_CB_TXS_FAILED) {
++-		info->status.rates[0].count = 0;
++-		info->status.rates[0].idx = -1;
++-		info->flags |= IEEE80211_TX_STAT_ACK;
+++		/* Increment station counter */
+++		if (wcid && wcid->sta)
+++			wcid->txs_failed_cnt++;
+++
+++		/* Check if station counter exceeded the max*/
+++		if (!(wcid && wcid->txs_failed_cnt >= 25)) {
+++			info->status.rates[0].count = 0;
+++			info->status.rates[0].idx = -1;
+++			info->flags |= IEEE80211_TX_STAT_ACK;
+++		} else {
+++			dev_warn(dev->dev, "txs failed wcid=%d txs_failed_cnt=%d\n",
+++				 wcid->idx, wcid->txs_failed_cnt);
+++		}
+++	} else {
+++		/* Reset station counter */
+++		if (wcid && wcid->sta)
+++			wcid->txs_failed_cnt = 0;
++ 	}
++ 
++ 	__skb_queue_tail(list, skb);
++-- 
++2.43.0
++
+diff --git a/package/kernel/mt76/patches/0002-mt76x02-avoid-action-ghost-ack.patch b/package/kernel/mt76/patches/0002-mt76x02-avoid-action-ghost-ack.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ecf6e512eafab7c7a40a08ae6fc9b6455b569749
+--- /dev/null
++++ b/package/kernel/mt76/patches/0002-mt76x02-avoid-action-ghost-ack.patch
+@@ -0,0 +1,78 @@
++From bd92ece65ec612444d14eba4402fc358fada2541 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 2 Mar 2024 13:14:49 +0100
++Subject: [PATCH 2/4] mt76x02: avoid action ghost-ack
++
++On PMF enabled networks, chip reports ACTION frames always as acked.
++
++In case a roaming-assistant sens link-measurements periodically,
++this results in the station never becoming inactive and not being removed
++from the AP's station list.
++
++Avoid this from happening by marking action frames sent on a PMF enabled
++network as no-ack.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt76x02_mac.c | 25 +++++++++++++++++++++++++
++ mt76x02_mac.h |  1 +
++ 2 files changed, 26 insertions(+)
++
++diff --git a/mt76x02_mac.c b/mt76x02_mac.c
++index d5db6ffd..0ee775d5 100644
++--- a/mt76x02_mac.c
+++++ b/mt76x02_mac.c
++@@ -544,6 +544,7 @@ void mt76x02_send_tx_status(struct mt76x02_dev *dev,
++ 	struct ieee80211_tx_status status = {
++ 		.info = &info
++ 	};
+++	struct ieee80211_hdr *hdr;
++ 	static const u8 ac_to_tid[4] = {
++ 		[IEEE80211_AC_BE] = 0,
++ 		[IEEE80211_AC_BK] = 1,
++@@ -619,6 +620,30 @@ void mt76x02_send_tx_status(struct mt76x02_dev *dev,
++ 		*update = 1;
++ 	}
++ 
+++	if (msta && status.skb && (status.info->flags & IEEE80211_TX_STAT_ACK)) {
+++		hdr = (struct ieee80211_hdr *)status.skb->data;
+++
+++		if (ieee80211_has_protected(hdr->frame_control) &&
+++		    ieee80211_is_robust_mgmt_frame(status.skb)) {
+++			/**
+++			 * On PMF enabled networks, chip reports ACTION frames always as acked.
+++			 *
+++			 * In case a roaming-assistant sens link-measurements periodically,
+++			 * this results in the station never becoming inactive and not
+++			 * being removed from the AP's station list.
+++			 */
+++
+++			if (msta->n_enc_mgmt >= 10)
+++				status.info->flags &= ~IEEE80211_TX_STAT_ACK;
+++
+++			msta->n_enc_mgmt++;
+++		} else {
+++			if (msta->n_enc_mgmt > 0)
+++				dev_warn(dev->mt76.dev, "ACK for DATA frame after MGMT wcid=%d\n", wcid->idx);
+++			msta->n_enc_mgmt = 0;
+++		}
+++	}
+++
++ 	if (status.skb) {
++ 		info = *status.info;
++ 		len = status.skb->len;
++diff --git a/mt76x02_mac.h b/mt76x02_mac.h
++index 5dc6c834..1bd2288f 100644
++--- a/mt76x02_mac.h
+++++ b/mt76x02_mac.h
++@@ -39,6 +39,7 @@ struct mt76x02_sta {
++ 	struct mt76x02_vif *vif;
++ 	struct mt76x02_tx_status status;
++ 	int n_frames;
+++	u8 n_enc_mgmt;
++ 
++ 	struct ewma_pktlen pktlen;
++ };
++-- 
++2.43.0
++
+diff --git a/package/kernel/mt76/patches/0003-mt7603-reset-when-exceeding-TXS-misses.patch b/package/kernel/mt76/patches/0003-mt7603-reset-when-exceeding-TXS-misses.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..42894be8c31330072a89c0a21329b0ddf308070b
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-mt7603-reset-when-exceeding-TXS-misses.patch
+@@ -0,0 +1,135 @@
++From 6dd718307198ec678ec8d4efc7b8dd47bf5fe408 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 3 Mar 2024 22:38:47 +0100
++Subject: [PATCH 3/4] mt7603: reset when exceeding TXS misses
++
++---
++ mt76.h           |  2 ++
++ mt7603/debugfs.c |  1 +
++ mt7603/mac.c     | 15 +++++++++++++++
++ mt7603/mt7603.h  |  2 ++
++ tx.c             |  9 +++++++++
++ 5 files changed, 29 insertions(+)
++
++diff --git a/mt76.h b/mt76.h
++index 6d9b7028..c12f6e6c 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -831,6 +831,8 @@ struct mt76_dev {
++ 
++ 	u32 rev;
++ 
+++	u8 txs_failed_cnt;
+++
++ 	struct tasklet_struct pre_tbtt_tasklet;
++ 	int beacon_int;
++ 	u8 beacon_mask;
++diff --git a/mt7603/debugfs.c b/mt7603/debugfs.c
++index 3967f2f0..0e495364 100644
++--- a/mt7603/debugfs.c
+++++ b/mt7603/debugfs.c
++@@ -8,6 +8,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
++ 	struct mt7603_dev *dev = dev_get_drvdata(s->private);
++ 	static const char * const reset_cause_str[] = {
++ 		[RESET_CAUSE_TX_HANG] = "TX hang",
+++		[RESET_CAUSE_TXS_HANG] = "TXS hang",
++ 		[RESET_CAUSE_TX_BUSY] = "TX DMA busy stuck",
++ 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
++ 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index cf21d062..d3f4f086 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -1561,6 +1561,17 @@ static bool mt7603_tx_hang(struct mt7603_dev *dev)
++ 	return i < 4;
++ }
++ 
+++static bool mt7603_txs_hang(struct mt7603_dev *dev)
+++{
+++	struct mt76_dev *mdev = &dev->mt76;
+++
+++	if (mdev->txs_failed_cnt > 30) {
+++		dev_warn(mdev->dev, "Global TXS hang count=%d\n", mdev->txs_failed_cnt);
+++	}
+++
+++	return mdev->txs_failed_cnt > 10;
+++}
+++
++ static bool mt7603_rx_pse_busy(struct mt7603_dev *dev)
++ {
++ 	u32 addr, val;
++@@ -1861,6 +1872,9 @@ void mt7603_mac_work(struct work_struct *work)
++ 	    mt7603_watchdog_check(dev, &dev->tx_hang_check,
++ 				  RESET_CAUSE_TX_HANG,
++ 				  mt7603_tx_hang) ||
+++		mt7603_watchdog_check(dev, &dev->txs_hang_check,
+++				  RESET_CAUSE_TXS_HANG,
+++				  mt7603_txs_hang) ||
++ 	    mt7603_watchdog_check(dev, &dev->tx_dma_check,
++ 				  RESET_CAUSE_TX_BUSY,
++ 				  mt7603_tx_dma_busy) ||
++@@ -1874,6 +1888,7 @@ void mt7603_mac_work(struct work_struct *work)
++ 		dev->beacon_check = 0;
++ 		dev->tx_dma_check = 0;
++ 		dev->tx_hang_check = 0;
+++		dev->txs_hang_check = 0;
++ 		dev->rx_dma_check = 0;
++ 		dev->rx_pse_check = 0;
++ 		dev->mcu_hang = 0;
++diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
++index 9e58df70..2db0c2cb 100644
++--- a/mt7603/mt7603.h
+++++ b/mt7603/mt7603.h
++@@ -90,6 +90,7 @@ struct mt7603_vif {
++ 
++ enum mt7603_reset_cause {
++ 	RESET_CAUSE_TX_HANG,
+++	RESET_CAUSE_TXS_HANG,
++ 	RESET_CAUSE_TX_BUSY,
++ 	RESET_CAUSE_RX_BUSY,
++ 	RESET_CAUSE_BEACON_STUCK,
++@@ -142,6 +143,7 @@ struct mt7603_dev {
++ 
++ 	u8 beacon_check;
++ 	u8 tx_hang_check;
+++	u8 txs_hang_check;
++ 	u8 tx_dma_check;
++ 	u8 rx_dma_check;
++ 	u8 rx_pse_check;
++diff --git a/tx.c b/tx.c
++index 760cf6fb..7a43dbfd 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -104,6 +104,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 
++ 	/* Tx status can be unreliable. if it fails, mark the frame as ACKed */
++ 	if (flags & MT_TX_CB_TXS_FAILED) {
+++		/* Increment global counter */
+++		dev->txs_failed_cnt++;
+++
++ 		/* Increment station counter */
++ 		if (wcid && wcid->sta)
++ 			wcid->txs_failed_cnt++;
++@@ -118,6 +121,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 				 wcid->idx, wcid->txs_failed_cnt);
++ 		}
++ 	} else {
+++		/* Reset global counter */
+++		dev->txs_failed_cnt = 0;
+++
++ 		/* Reset station counter */
++ 		if (wcid && wcid->sta)
++ 			wcid->txs_failed_cnt = 0;
++@@ -235,6 +241,9 @@ mt76_tx_status_check(struct mt76_dev *dev, bool flush)
++ 	list_for_each_entry_safe(wcid, tmp, &dev->wcid_list, list)
++ 		mt76_tx_status_skb_get(dev, wcid, flush ? -1 : 0, &list);
++ 	mt76_tx_status_unlock(dev, &list);
+++
+++	if (flush)
+++		dev->txs_failed_cnt = 0;
++ }
++ EXPORT_SYMBOL_GPL(mt76_tx_status_check);
++ 
++-- 
++2.43.0
++
+diff --git a/package/kernel/mt76/patches/0004-mt7603-debug-potential-memleak.patch b/package/kernel/mt76/patches/0004-mt7603-debug-potential-memleak.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..de646494ab082fdaee8ea2b29c7004265605008a
+--- /dev/null
++++ b/package/kernel/mt76/patches/0004-mt7603-debug-potential-memleak.patch
+@@ -0,0 +1,32 @@
++From e2c1e17035cb917725c4769ab819d6dbbc4e8cf1 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 3 Mar 2024 22:42:02 +0100
++Subject: [PATCH 4/4] mt7603: debug potential memleak
++
++---
++ mt7603/beacon.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/mt7603/beacon.c b/mt7603/beacon.c
++index c223f7c1..c305fd19 100644
++--- a/mt7603/beacon.c
+++++ b/mt7603/beacon.c
++@@ -56,6 +56,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BCN));
++ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
++ 		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
+++		dev_err(mdev->dev, "Proudly leaking memory\n");
++ 		goto out;
++ 	}
++ 
++@@ -63,6 +64,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BMC));
++ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
++ 		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
+++		dev_err(mdev->dev, "Proudly leaking memory\n");
++ 		goto out;
++ 	}
++ 
++-- 
++2.43.0
++
