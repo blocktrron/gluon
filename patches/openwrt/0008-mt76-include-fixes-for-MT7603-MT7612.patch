@@ -4,11 +4,11 @@ Subject: mt76: include fixes for MT7603 / MT7612
 
 diff --git a/package/kernel/mt76/patches/0001-tx-add-limit-for-TXS-ack-override.patch b/package/kernel/mt76/patches/0001-tx-add-limit-for-TXS-ack-override.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..db2e4cb2bbc296ef05b10997d5ef8ab22d386340
+index 0000000000000000000000000000000000000000..000a1fc5e3bdfdebc2ffeb13750b61c94f6ba6bd
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0001-tx-add-limit-for-TXS-ack-override.patch
-@@ -0,0 +1,82 @@
-+From 31c8fe278fc1fb35ab22c72c529694ce18ca2955 Mon Sep 17 00:00:00 2001
+@@ -0,0 +1,79 @@
++From 27b394d30f9fbb64f86259fe8e69556d1609e66f Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Fri, 1 Mar 2024 17:41:33 +0100
 +Subject: [PATCH 1/4] tx: add limit for TXS ack override
@@ -25,8 +25,8 @@ index 0000000000000000000000000000000000000000..db2e4cb2bbc296ef05b10997d5ef8ab2
 +Signed-off-by: David Bauer <mail@david-bauer.net>
 +---
 + mt76.h |  2 ++
-+ tx.c   | 23 ++++++++++++++++++++++-
-+ 2 files changed, 24 insertions(+), 1 deletion(-)
++ tx.c   | 20 +++++++++++++++++++-
++ 2 files changed, 21 insertions(+), 1 deletion(-)
 +
 +diff --git a/mt76.h b/mt76.h
 +index fd527649..6d9b7028 100644
@@ -42,7 +42,7 @@ index 0000000000000000000000000000000000000000..db2e4cb2bbc296ef05b10997d5ef8ab2
 + 	bool sw_iv;
 + 
 +diff --git a/tx.c b/tx.c
-+index 1809b032..bbf96c71 100644
++index 1809b032..83661763 100644
 +--- a/tx.c
 ++++ b/tx.c
 +@@ -91,6 +91,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
@@ -53,7 +53,7 @@ index 0000000000000000000000000000000000000000..db2e4cb2bbc296ef05b10997d5ef8ab2
 + 	u8 done = MT_TX_CB_DMA_DONE | MT_TX_CB_TXS_DONE;
 + 
 + 	flags |= cb->flags;
-+@@ -98,12 +99,32 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++@@ -98,12 +99,29 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
 + 
 + 	if ((flags & done) != done)
 + 		return;
@@ -76,9 +76,6 @@ index 0000000000000000000000000000000000000000..db2e4cb2bbc296ef05b10997d5ef8ab2
 ++			if (wcid)
 ++				dev_warn(dev->dev, "dropping ack wcid=%d txs_failed_cnt=%d\n",
 ++					 wcid->idx, wcid->txs_failed_cnt);
-++		} else if ((wcid->txs_failed_cnt % 5) == 0) {
-++			dev_warn(dev->dev, "txs failed wcid=%d txs_failed_cnt=%d\n",
-++				 wcid->idx, wcid->txs_failed_cnt);
 ++		}
 ++	} else if (info->flags & IEEE80211_TX_STAT_ACK) {
 ++		/* Reset station counter */
@@ -92,11 +89,11 @@ index 0000000000000000000000000000000000000000..db2e4cb2bbc296ef05b10997d5ef8ab2
 +
 diff --git a/package/kernel/mt76/patches/0002-mt76x02-avoid-action-ghost-ack.patch b/package/kernel/mt76/patches/0002-mt76x02-avoid-action-ghost-ack.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..b307be1c929d8afa3a4838ee4dc225feaae151b0
+index 0000000000000000000000000000000000000000..5d5524c671be1dd8436bfb58d60e793bf3ae553c
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0002-mt76x02-avoid-action-ghost-ack.patch
 @@ -0,0 +1,78 @@
-+From d79b51b58085a0029c366125bed05491ad3d44db Mon Sep 17 00:00:00 2001
++From 32e96d1548d50844347150d336588f5175058066 Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Sat, 2 Mar 2024 13:14:49 +0100
 +Subject: [PATCH 2/4] mt76x02: avoid action ghost-ack
@@ -176,11 +173,11 @@ index 0000000000000000000000000000000000000000..b307be1c929d8afa3a4838ee4dc225fe
 +
 diff --git a/package/kernel/mt76/patches/0003-mt7603-reset-when-exceeding-TXS-misses.patch b/package/kernel/mt76/patches/0003-mt7603-reset-when-exceeding-TXS-misses.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937dd4ca0b6b
+index 0000000000000000000000000000000000000000..723f29ab307b1c1ddce38c496c23cf00b32b3bf8
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0003-mt7603-reset-when-exceeding-TXS-misses.patch
 @@ -0,0 +1,135 @@
-+From 7f5bcea7e3d275b209d9b38ebcad4b9c569d0e63 Mon Sep 17 00:00:00 2001
++From 7af5094a2034a29f771aca0ef5219d6f4ef0e5f4 Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Sun, 3 Mar 2024 22:38:47 +0100
 +Subject: [PATCH 3/4] mt7603: reset when exceeding TXS misses
@@ -219,7 +216,7 @@ index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937d
 + 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
 + 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
 +diff --git a/mt7603/mac.c b/mt7603/mac.c
-+index cf21d062..d3f4f086 100644
++index cf21d062..46c5fd8c 100644
 +--- a/mt7603/mac.c
 ++++ b/mt7603/mac.c
 +@@ -1561,6 +1561,17 @@ static bool mt7603_tx_hang(struct mt7603_dev *dev)
@@ -230,11 +227,11 @@ index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937d
 ++{
 ++	struct mt76_dev *mdev = &dev->mt76;
 ++
-++	if (mdev->txs_failed_cnt > 30) {
+++	if (mdev->txs_failed_cnt > 25) {
 ++		dev_warn(mdev->dev, "Global TXS hang count=%d\n", mdev->txs_failed_cnt);
 ++	}
 ++
-++	return mdev->txs_failed_cnt > 10;
+++	return mdev->txs_failed_cnt > 25;
 ++}
 ++
 + static bool mt7603_rx_pse_busy(struct mt7603_dev *dev)
@@ -279,7 +276,7 @@ index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937d
 + 	u8 rx_dma_check;
 + 	u8 rx_pse_check;
 +diff --git a/tx.c b/tx.c
-+index bbf96c71..61a3576f 100644
++index 83661763..412691c2 100644
 +--- a/tx.c
 ++++ b/tx.c
 +@@ -104,6 +104,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
@@ -292,8 +289,8 @@ index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937d
 + 		/* Increment station counter */
 + 		if (wcid && wcid->sta)
 + 			wcid->txs_failed_cnt++;
-+@@ -122,6 +125,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
-+ 				 wcid->idx, wcid->txs_failed_cnt);
++@@ -119,6 +122,9 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 					 wcid->idx, wcid->txs_failed_cnt);
 + 		}
 + 	} else if (info->flags & IEEE80211_TX_STAT_ACK) {
 ++		/* Reset global counter */
@@ -302,7 +299,7 @@ index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937d
 + 		/* Reset station counter */
 + 		if (wcid && wcid->sta)
 + 			wcid->txs_failed_cnt = 0;
-+@@ -239,6 +245,9 @@ mt76_tx_status_check(struct mt76_dev *dev, bool flush)
++@@ -236,6 +242,9 @@ mt76_tx_status_check(struct mt76_dev *dev, bool flush)
 + 	list_for_each_entry_safe(wcid, tmp, &dev->wcid_list, list)
 + 		mt76_tx_status_skb_get(dev, wcid, flush ? -1 : 0, &list);
 + 	mt76_tx_status_unlock(dev, &list);
@@ -317,11 +314,11 @@ index 0000000000000000000000000000000000000000..08c4cfea0ec541c6336933feb7d1937d
 +
 diff --git a/package/kernel/mt76/patches/0004-mt7603-debug-potential-memleak.patch b/package/kernel/mt76/patches/0004-mt7603-debug-potential-memleak.patch
 new file mode 100644
-index 0000000000000000000000000000000000000000..652dc4ea3800a3f23f650ea768ea672bdfac979a
+index 0000000000000000000000000000000000000000..4fdbeab18d6a6d42b5b6f0252ec4bcc09f97d7cc
 --- /dev/null
 +++ b/package/kernel/mt76/patches/0004-mt7603-debug-potential-memleak.patch
 @@ -0,0 +1,32 @@
-+From e97b08d098ffbfc2747205481ad50bf1847322dd Mon Sep 17 00:00:00 2001
++From 2667b3b57590c52ee260388dbc91d7448812931c Mon Sep 17 00:00:00 2001
 +From: David Bauer <mail@david-bauer.net>
 +Date: Sun, 3 Mar 2024 22:42:02 +0100
 +Subject: [PATCH 4/4] mt7603: debug potential memleak
