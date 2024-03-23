@@ -1,0 +1,52 @@
+---
+name: "Update OpenWrt base"
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to create update for"
+        required: true
+        default: "master"
+
+jobs:
+  update-openwrt:
+    runs-on: ubuntu-22.04
+    env:
+      GLUON_CHECKOUT_DIR: /tmp/gluon
+      COMMIT_MESSAGE_PATH: /tmp/commit-message.txt
+      BUILD_INFO: .github/build-info.json
+      BUILD_INFO_TMP: .github/build-info.json.tmp
+      COMMIT_NAME: GitHub Actions
+      COMMIT_EMAIL: info@darmstadt.freifunk.net
+    steps:
+      - name: Clone Gluon
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      
+      - name: Configure Git User and E-Mail
+        run: git config --global user.name "Gluon Bot" && git config --global user.email "bot@freifunk-gluon.github.io"
+      
+      - name: Get update branch name
+        id: branch-name
+        run: echo "branch-name=update-openwrt-${{ github.event.inputs.branch }}-$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Link example Site
+        run: ln -s docs/site-example site
+      
+      - name: Invoke update-modules
+        run: make update-modules
+      
+      - name: Refresh patches
+        run: make refresh-patches
+      
+      - name: Checkout individual branch name
+        run: git checkout -b ${{ steps.branch-name.outputs.branch-name }}
+      
+      - name: Push branch
+        run: git push origin HEAD
+
+      - name: Emit PR creation message
+        run:
+          echo "::notice::Create pull-request at https://github.com/${{ github.repository }}/compare/${{ github.event.inputs.branch }}...${{ steps.branch-name.outputs.branch-name }}?quick_pull=1"
