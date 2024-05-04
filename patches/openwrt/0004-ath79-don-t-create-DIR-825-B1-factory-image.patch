@@ -12,10 +12,10 @@ factory image and install a Gluon sysupgrade.
 Signed-off-by: David Bauer <mail@david-bauer.net>
 
 diff --git a/target/linux/ath79/image/generic.mk b/target/linux/ath79/image/generic.mk
-index e7960efbaa2de9228cb2aac89669829a2ffa6cd9..4eb35b4a37aa0a43b5641ce6a1488d80af96112c 100644
+index bf300dd18d70a1064043226983b103f500a9d67b..f1e2d97f51d700a77e9fdc3a7fc658b9a6c3b97f 100644
 --- a/target/linux/ath79/image/generic.mk
 +++ b/target/linux/ath79/image/generic.mk
-@@ -1211,11 +1211,6 @@ define Device/dlink_dir-825-b1
+@@ -1187,11 +1187,6 @@ define Device/dlink_dir-825-b1
    DEVICE_PACKAGES := kmod-usb-ohci kmod-usb2 kmod-usb-ledtrig-usbport \
  	kmod-leds-reset kmod-owl-loader kmod-switch-rtl8366s
    IMAGE_SIZE := 7808k
