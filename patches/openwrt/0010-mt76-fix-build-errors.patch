@@ -1,0 +1,36 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 18 May 2024 12:24:47 +0200
+Subject: mt76: fix build errors
+
+Fixes the following build error:
+
+error: ISO C90 forbids mixed declarations and code [-Werror=declaration-after-statement]
+60 |                 u8 qid = tid_to_ac[tid];
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/kernel/mt76/patches/0009-fix-build.patch b/package/kernel/mt76/patches/0009-fix-build.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..89626e94dde447e7a6fc2619b61451c2e457e5b8
+--- /dev/null
++++ b/package/kernel/mt76/patches/0009-fix-build.patch
+@@ -0,0 +1,19 @@
++--- a/mt7603/dma.c
+++++ b/mt7603/dma.c
++@@ -33,6 +33,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev
++ 	void *priv;
++ 	int idx;
++ 	u32 val;
+++	u8 qid;
++ 
++ 	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
++ 		goto free;
++@@ -57,7 +58,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev
++ 	if (ieee80211_is_data_qos(hdr->frame_control)) {
++ 		tid = *ieee80211_get_qos_ctl(hdr) &
++ 			 IEEE80211_QOS_CTL_TAG1D_MASK;
++-		u8 qid = tid_to_ac[tid];
+++		qid = tid_to_ac[tid];
++ 		hwq = wmm_queue_map[qid];
++ 		skb_set_queue_mapping(skb, qid);
++ 	} else if (ieee80211_is_data(hdr->frame_control)) {
