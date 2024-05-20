@@ -1,0 +1,36 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Tue, 21 May 2024 01:18:09 +0200
+Subject: apup: copy HE capabilities
+
+diff --git a/package/network/services/hostapd/patches/999-APuP-fix-HE-elems.patch b/package/network/services/hostapd/patches/999-APuP-fix-HE-elems.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..9af46a48c8f874ad5077c943caf5eeedde2874a3
+--- /dev/null
++++ b/package/network/services/hostapd/patches/999-APuP-fix-HE-elems.patch
+@@ -0,0 +1,26 @@
++From 47e7a16b4b9fde1410b858186cddfbdc306eced0 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Tue, 21 May 2024 01:16:19 +0200
++Subject: [PATCH] apup: copy HE capabilities
++
++---
++ src/ap/apup.c | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/src/ap/apup.c b/src/ap/apup.c
++index 7c4c832c4..f7930bc8e 100644
++--- a/src/ap/apup.c
+++++ b/src/ap/apup.c
++@@ -90,6 +90,9 @@ void apup_process_beacon(struct hostapd_data *hapd,
++ #endif // def CONFIG_IEEE80211AC
++ #ifdef CONFIG_IEEE80211AX
++ 	copy_sta_he_6ghz_capab(hapd, sta_ret,  elems->he_6ghz_band_cap);
+++	copy_sta_he_capab(hapd, sta_ret, IEEE80211_MODE_AP,
+++			  elems->he_capabilities,
+++			  elems->he_capabilities_len);
++ #endif // def CONFIG_IEEE80211AX
++ #ifdef CONFIG_IEEE80211BE
++ 	copy_sta_eht_capab( hapd, sta_ret,
++-- 
++2.43.0
++
