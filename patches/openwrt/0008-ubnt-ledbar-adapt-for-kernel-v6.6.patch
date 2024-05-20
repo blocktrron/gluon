@@ -1,0 +1,62 @@
+From: Sven Wegener <sven.wegener@stealer.net>
+Date: Fri, 10 May 2024 13:52:00 +0200
+Subject: ubnt-ledbar: adapt for kernel v6.6
+
+Linux kernel commit torvalds/linux@b8a1a4cd5a98a2adf8dfd6902cd98e57d910ee12
+added a temporary probe_new member to struct i2c_driver, to drop the
+rarely used second parameter of the probe function and not break API for
+out of tree drivers. With torvalds/linux@5eb1e6e459cfa025f79c43014f66ff62a55542f1,
+which is part of v6.6, this probe_new member is dropped and the
+signature of the probe function is updated.
+
+ubnt-ledbar is used by the mediatek and ramips targets and both have
+been updated to v6.6, so adapt the probe function signature and remove
+other compat code for versions before v6.6.
+
+Signed-off-by: Sven Wegener <sven.wegener@stealer.net>
+Link: https://github.com/openwrt/openwrt/pull/15443
+Signed-off-by: Robert Marko <robimarko@gmail.com>
+
+diff --git a/package/kernel/ubnt-ledbar/src/leds-ubnt-ledbar.c b/package/kernel/ubnt-ledbar/src/leds-ubnt-ledbar.c
+index ee9d34601c6fec508713aa091f7dd7c5d2d9aa6e..e0516322dc35b1f5b9f9c94b6b1ea82d9770788a 100644
+--- a/package/kernel/ubnt-ledbar/src/leds-ubnt-ledbar.c
++++ b/package/kernel/ubnt-ledbar/src/leds-ubnt-ledbar.c
+@@ -9,7 +9,6 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/gpio/consumer.h>
+-#include <linux/version.h>
+ 
+ /**
+  * Driver for the Ubiquiti RGB LED controller (LEDBAR).
+@@ -167,9 +166,7 @@ static int ubnt_ledbar_init_led(struct device_node *np, struct ubnt_ledbar *ledb
+ 	return ret;
+ }
+ 
+-
+-static int ubnt_ledbar_probe(struct i2c_client *client,
+-			     const struct i2c_device_id *id)
++static int ubnt_ledbar_probe(struct i2c_client *client)
+ {
+ 	struct device_node *np = client->dev.of_node;
+ 	struct ubnt_ledbar *ledbar;
+@@ -219,19 +216,11 @@ static int ubnt_ledbar_probe(struct i2c_client *client,
+ 	return ubnt_ledbar_apply_state(ledbar);
+ }
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
+-static int ubnt_ledbar_remove(struct i2c_client *client)
+-#else
+ static void ubnt_ledbar_remove(struct i2c_client *client)
+-#endif
+ {
+ 	struct ubnt_ledbar *ledbar = i2c_get_clientdata(client);
+ 
+ 	mutex_destroy(&ledbar->lock);
+-
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
+-	return 0;
+-#endif
+ }
+ 
+ static const struct i2c_device_id ubnt_ledbar_id[] = {
