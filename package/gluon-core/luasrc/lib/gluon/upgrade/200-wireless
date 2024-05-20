@@ -127,22 +127,18 @@ local function configure_mesh(config, radio, index, suffix, disabled)
 		return
 	end
 
-	uci:section('network', 'interface', name, {
-		proto = 'gluon_mesh',
-	})
-
 	uci:section('wireless', 'wifi-iface', name, {
 		device = radio_name,
 		network = name,
-		mode = 'mesh',
-		mesh_id = config.id,
-		mesh_fwding = false,
+		mode = 'ap',
+		ssid = config.id,
 		macaddr = macaddr,
 		mcast_rate = config.mcast_rate,
-		ifname = suffix and 'mesh' .. suffix,
+		ifname = suffix and 'apup' .. suffix,
 		disabled = disabled,
-		macfilter = macfilter,
-		maclist = maclist,
+		apup = '1',
+		multicast_to_unicast_all = '1',
+		apup_peer_ifname_prefix = 'apuppeer' .. suffix .. '_',
 	})
 end
 

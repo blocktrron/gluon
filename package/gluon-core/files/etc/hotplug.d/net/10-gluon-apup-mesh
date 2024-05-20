@@ -1,0 +1,12 @@
+[ "$ACTION" = 'add' ] || exit 0
+
+case "$INTERFACE" in
+	apuppeer*)
+		echo "Interface starts with ap"
+		batctl if add "$INTERFACE"
+		;;
+	*)
+		echo "Interface does not start with ap"
+		;;
+esac
+
