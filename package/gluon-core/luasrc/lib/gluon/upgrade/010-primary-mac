@@ -15,6 +15,37 @@ local util = require 'gluon.util'
 local board_data = json.load('/etc/board.json')
 local network_data = (board_data or {}).network
 
+local function valid_mac_address(mac_address)
+	if mac_address == nil then
+		return false
+	end
+
+	if mac_address:match('^([0-9a-fA-F][0-9a-fA-F]:){5}[0-9a-fA-F][0-9a-fA-F]$') == nil then
+		return false
+	end
+
+	if mac_address == '00:00:00:00:00:00' then
+		return false
+	end
+
+	if mac_address:lower() == 'ff:ff:ff:ff:ff:ff' then
+		return false
+	end
+
+	return true
+end
+
+local function generate_random_mac()
+	-- Generate random MAC with OUI 22:05:B6
+	local mac = "22:05:B6"
+
+	for i = 1, 3 do
+		mac = mac .. string.format(":%02X", math.random(0, 255))
+	end
+
+	return mac
+end
+
 local function read(...)
 	local addr = util.readfile(string.format(...))
 	if addr then
@@ -161,12 +192,14 @@ for _, matcher in ipairs(primary_addrs) do
 	for _, match in ipairs(matches) do
 		if platform.match(unpack(match)) then
 			local addr = f()
-			if addr then
+			if addr and valid_mac_address(addr) then
 				sysconfig.primary_mac = addr:lower()
 				return
 			end
 		end
 	end
 end
+
+
 
 error('no primary MAC address found')
