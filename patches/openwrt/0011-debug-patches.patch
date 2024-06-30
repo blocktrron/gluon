@@ -1,0 +1,114 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 30 Jun 2024 17:47:06 +0200
+Subject: debug patches
+
+diff --git a/package/kernel/mt76/patches/0001-dma-disable-fragment-re-arranegement.patch b/package/kernel/mt76/patches/0001-dma-disable-fragment-re-arranegement.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4a470cfaafe235d4fc4d25aecccb58a21ba652c4
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-dma-disable-fragment-re-arranegement.patch
+@@ -0,0 +1,34 @@
++From f7e60239a83e2142dca05ba63cdb6097d6e17128 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 30 Jun 2024 17:23:35 +0200
++Subject: [PATCH 1/3] dma: disable fragment re-arranegement
++
++---
++ dma.c | 4 ++--
++ 1 file changed, 2 insertions(+), 2 deletions(-)
++
++diff --git a/dma.c b/dma.c
++index f4f88c44..a2eaa414 100644
++--- a/dma.c
+++++ b/dma.c
++@@ -807,7 +807,7 @@ mt76_add_fragment(struct mt76_dev *dev, struct mt76_queue *q, void *data,
++ 	struct skb_shared_info *shinfo = skb_shinfo(skb);
++ 	int nr_frags = shinfo->nr_frags;
++ 
++-	if (nr_frags < ARRAY_SIZE(shinfo->frags)) {
+++	if (0 && nr_frags < ARRAY_SIZE(shinfo->frags)) {
++ 		struct page *page = virt_to_head_page(data);
++ 		int offset = data - page_address(page) + q->buf_offset;
++ 
++@@ -820,7 +820,7 @@ mt76_add_fragment(struct mt76_dev *dev, struct mt76_queue *q, void *data,
++ 		return;
++ 
++ 	q->rx_head = NULL;
++-	if (nr_frags < ARRAY_SIZE(shinfo->frags))
+++	if (0 && nr_frags < ARRAY_SIZE(shinfo->frags))
++ 		dev->drv->rx_skb(dev, q - dev->q_rx, skb, &info);
++ 	else
++ 		dev_kfree_skb(skb);
++-- 
++2.43.0
++
+diff --git a/package/kernel/mt76/patches/0002-main-add-message-when-releasing-ps-frames.patch b/package/kernel/mt76/patches/0002-main-add-message-when-releasing-ps-frames.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc147fc9b0faaadddc52a3781085088a6cb2c2cd
+--- /dev/null
++++ b/package/kernel/mt76/patches/0002-main-add-message-when-releasing-ps-frames.patch
+@@ -0,0 +1,33 @@
++From 3812329e3a85fd6c12f3061ca765d6bfb3cfa9db Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 30 Jun 2024 17:37:06 +0200
++Subject: [PATCH 2/3] main: add message when releasing ps frames
++
++---
++ mt7603/main.c | 6 ++++++
++ 1 file changed, 6 insertions(+)
++
++diff --git a/mt7603/main.c b/mt7603/main.c
++index 89d738de..ee0f51e5 100644
++--- a/mt7603/main.c
+++++ b/mt7603/main.c
++@@ -403,10 +403,16 @@ static void
++ mt7603_ps_tx_list(struct mt7603_dev *dev, struct sk_buff_head *list)
++ {
++ 	struct sk_buff *skb;
+++	int print = 0;
++ 
++ 	while ((skb = __skb_dequeue(list)) != NULL) {
++ 		int qid = skb_get_queue_mapping(skb);
++ 
+++		if (!print) {
+++			print = 1;
+++			dev_warn(dev->mt76.dev, "Releasing PS packets\n");
+++		}
+++
++ 		mt76_tx_queue_skb_raw(dev, dev->mphy.q_tx[qid], skb, 0);
++ 	}
++ }
++-- 
++2.43.0
++
+diff --git a/package/kernel/mt76/patches/0003-dma-ignore-loopback-packets.patch b/package/kernel/mt76/patches/0003-dma-ignore-loopback-packets.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7d7818f81d4c047f5001d97252b4d5fec188c7be
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-dma-ignore-loopback-packets.patch
+@@ -0,0 +1,25 @@
++From a8771dea21dc9fc13b59f51a695c986f1bcb33be Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 30 Jun 2024 17:38:37 +0200
++Subject: [PATCH 3/3] dma: ignore loopback packets
++
++---
++ mt7603/dma.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/mt7603/dma.c b/mt7603/dma.c
++index e238161d..bc09a98d 100644
++--- a/mt7603/dma.c
+++++ b/mt7603/dma.c
++@@ -34,7 +34,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
++ 	int idx;
++ 	u32 val;
++ 
++-	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
+++	if (1 || skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
++ 		goto free;
++ 
++ 	val = le32_to_cpu(txd[1]);
++-- 
++2.43.0
++
