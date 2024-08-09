@@ -36,7 +36,7 @@ end
 config('TARGET_ROOTFS_INITRAMFS', false)
 
 config('DEVEL', true)
-config('ALL_NONSHARED', true)
+config('ALL_NONSHARED', istrue(env.GLUON_BUILD_NONSHARED))
 
 try_config('PACKAGE_usbip', false) -- fails to build
 try_config('PACKAGE_coova-chilli', false) -- fails to build

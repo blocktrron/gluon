@@ -254,6 +254,12 @@ GLUON_AUTOREMOVE
   not set this flag during development (or generally, when you want to reuse your build tree for subsequent builds),
   as it significantly increases incremental build times.
 
+GLUON_BUILD_NONSHARED
+  Setting ``GLUON_BUILD_NONSHARED=0`` will disable the build of target-specific packages. This notably includes
+  (but is not limited to) kernel modules. This is useful when building in a CI environment, where those packages
+  are ususally not needed. Note however, that this will also alter the kernel-config, which can lead to different
+  images being built compared to the default configuration.
+
 GLUON_DEBUG
   Setting ``GLUON_DEBUG=1`` will provide firmware images including debugging symbols usable with GDB or
   similar tools. Requires a device or target with at least 16 MB of flash space, e.g. `x86-64`. Unset by default.
