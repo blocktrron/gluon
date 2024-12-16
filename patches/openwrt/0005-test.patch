@@ -1,0 +1,35 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Mon, 16 Dec 2024 15:53:27 +0100
+Subject: test
+
+diff --git a/toolchain/musl/patches/0001-test.patch b/toolchain/musl/patches/0001-test.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..fb0c135925ce4bba5c8c9d833b74260164dcad78
+--- /dev/null
++++ b/toolchain/musl/patches/0001-test.patch
+@@ -0,0 +1,25 @@
++From ad27c412747e6de4fb2dc1034f25538c0ebcfe8f Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 16 Dec 2024 15:51:02 +0100
++Subject: [PATCH] test
++
++---
++ src/misc/basename.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/src/misc/basename.c b/src/misc/basename.c
++index 438377b6..b728301b 100644
++--- a/src/misc/basename.c
+++++ b/src/misc/basename.c
++@@ -8,7 +8,7 @@ char *basename(char *s)
++ 	i = strlen(s)-1;
++ 	for (; i&&s[i]=='/'; i--) s[i] = 0;
++ 	for (; i&&s[i-1]!='/'; i--);
++-	return s+i;
+++	return &s[i];
++ }
++ 
++ weak_alias(basename, __xpg_basename);
++-- 
++2.45.2
++
