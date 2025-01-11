@@ -1,0 +1,36 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 11 Jan 2025 22:35:51 +0100
+Subject: mcu restart
+
+diff --git a/package/kernel/mt76/patches/0001-mt7915-add-mcu-restart.patch b/package/kernel/mt76/patches/0001-mt7915-add-mcu-restart.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..54684b8fd4b65248d9cd203dd7ab02cf9dcad302
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-mt7915-add-mcu-restart.patch
+@@ -0,0 +1,26 @@
++From a6944906dc9880ccf8a9f623561b58baf89198df Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 12 Jan 2025 10:40:46 +0100
++Subject: [PATCH] mac: shut down firmware
++
++---
++ mt7915/mac.c | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index 13bdc0a7..a4142fb3 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -1316,6 +1316,9 @@ mt7915_mac_restart(struct mt7915_dev *dev)
++ 	ext_phy = dev->mt76.phys[MT_BAND1];
++ 	phy2 = ext_phy ? ext_phy->priv : NULL;
++ 
+++	/* Shut down MCU FW*/
+++	mt7915_mcu_exit(dev);
+++
++ 	if (dev->hif2) {
++ 		mt76_wr(dev, MT_INT1_MASK_CSR, 0x0);
++ 		mt76_wr(dev, MT_INT1_SOURCE_CSR, ~0);
++-- 
++2.45.2
++
