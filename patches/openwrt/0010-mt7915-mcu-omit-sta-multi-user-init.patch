@@ -1,0 +1,39 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 11 Jan 2025 13:00:33 +0100
+Subject: mt7915: mcu: omit sta multi-user init
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/kernel/mt76/patches/0003-mcu-omit-sta-multi-user-init.patch b/package/kernel/mt76/patches/0003-mcu-omit-sta-multi-user-init.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7add7bed68115762cecdfbb29cacec5199ae86ce
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-mcu-omit-sta-multi-user-init.patch
+@@ -0,0 +1,27 @@
++From 0ea0bf457720ac8a32185dfca2dc9fd5da405aa8 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 10 Jan 2025 10:50:48 +0100
++Subject: [PATCH] mt7915: mcu: omit sta multi-user init
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mcu.c | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 9d790f23..9f7c59e9 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -892,6 +892,9 @@ mt7915_mcu_sta_muru_tlv(struct mt7915_dev *dev, struct sk_buff *skb,
++ 	struct sta_rec_muru *muru;
++ 	struct tlv *tlv;
++ 
+++	if (1)
+++		return;
+++
++ 	if (vif->type != NL80211_IFTYPE_STATION &&
++ 	    vif->type != NL80211_IFTYPE_AP)
++ 		return;
++-- 
++2.45.2
++
