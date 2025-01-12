@@ -1,0 +1,40 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 12 Jan 2025 11:46:57 +0100
+Subject: read firmware state
+
+diff --git a/package/kernel/mt76/patches/0001-read-firmware-state.patch b/package/kernel/mt76/patches/0001-read-firmware-state.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..76b16623c99bb8d6038e2f11803abd2330bba905
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-read-firmware-state.patch
+@@ -0,0 +1,30 @@
++From 762bc8ec4eacef936e2c8aad8ba9131eeed69c92 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 12 Jan 2025 11:46:16 +0100
++Subject: [PATCH] read firmware state
++
++---
++ mt7915/mcu.c | 4 +++-
++ 1 file changed, 3 insertions(+), 1 deletion(-)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 9d790f23..956b9343 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -2079,10 +2079,12 @@ mt7915_firmware_state(struct mt7915_dev *dev, bool wa)
++ {
++ 	u32 state = FIELD_PREP(MT_TOP_MISC_FW_STATE,
++ 			       wa ? FW_STATE_RDY : FW_STATE_FW_DOWNLOAD);
+++	u32 read_state;
++ 
++ 	if (!mt76_poll_msec(dev, MT_TOP_MISC, MT_TOP_MISC_FW_STATE,
++ 			    state, 1000)) {
++-		dev_err(dev->mt76.dev, "Timeout for initializing firmware\n");
+++		read_state = mt76_get_field(dev, MT_TOP_MISC, MT_TOP_MISC_FW_STATE);
+++		dev_err(dev->mt76.dev, "Timeout for initializing firmware %u\n", read_state);
++ 		return -EIO;
++ 	}
++ 	return 0;
++-- 
++2.45.2
++
