@@ -1,0 +1,71 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 12 Jan 2025 10:29:36 +0100
+Subject: reset: ath79: loop reset assertion on reboot
+
+diff --git a/target/linux/ath79/patches-6.6/999-reset-loop.patch b/target/linux/ath79/patches-6.6/999-reset-loop.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..946c6a9c40ee511d9917a25feadf20f8c53435fd
+--- /dev/null
++++ b/target/linux/ath79/patches-6.6/999-reset-loop.patch
+@@ -0,0 +1,61 @@
++--- a/drivers/reset/reset-ath79.c
+++++ b/drivers/reset/reset-ath79.c
++@@ -23,7 +23,7 @@ struct ath79_reset {
++ #define FULL_CHIP_RESET 24
++ 
++ static int ath79_reset_update(struct reset_controller_dev *rcdev,
++-			unsigned long id, bool assert)
+++			unsigned long id, bool assert, bool loop)
++ {
++ 	struct ath79_reset *ath79_reset =
++ 		container_of(rcdev, struct ath79_reset, rcdev);
++@@ -31,14 +31,16 @@ static int ath79_reset_update(struct res
++ 	u32 val;
++ 
++ 	spin_lock_irqsave(&ath79_reset->lock, flags);
++-	val = readl(ath79_reset->base);
++-	if (assert)
++-		val |= BIT(id);
++-	else
++-		val &= ~BIT(id);
++-	writel(val, ath79_reset->base);
++-	/* Flush cache */
++-	readl(ath79_reset->base);
+++	do {
+++		val = readl(ath79_reset->base);
+++		if (assert)
+++			val |= BIT(id);
+++		else
+++			val &= ~BIT(id);
+++		writel(val, ath79_reset->base);
+++		/* Flush cache */
+++		readl(ath79_reset->base);
+++	} while (loop);
++ 	spin_unlock_irqrestore(&ath79_reset->lock, flags);
++ 
++ 	return 0;
++@@ -47,13 +49,13 @@ static int ath79_reset_update(struct res
++ static int ath79_reset_assert(struct reset_controller_dev *rcdev,
++ 			unsigned long id)
++ {
++-	return ath79_reset_update(rcdev, id, true);
+++	return ath79_reset_update(rcdev, id, true, false);
++ }
++ 
++ static int ath79_reset_deassert(struct reset_controller_dev *rcdev,
++ 				unsigned long id)
++ {
++-	return ath79_reset_update(rcdev, id, false);
+++	return ath79_reset_update(rcdev, id, false, false);
++ }
++ 
++ static int ath79_reset_status(struct reset_controller_dev *rcdev,
++@@ -80,7 +82,7 @@ static int ath79_reset_restart_handler(s
++ 	struct ath79_reset *ath79_reset =
++ 		container_of(nb, struct ath79_reset, restart_nb);
++ 
++-	ath79_reset_assert(&ath79_reset->rcdev, FULL_CHIP_RESET);
+++	ath79_reset_update(&ath79_reset->rcdev, FULL_CHIP_RESET, true, true);
++ 
++ 	return NOTIFY_DONE;
++ }
