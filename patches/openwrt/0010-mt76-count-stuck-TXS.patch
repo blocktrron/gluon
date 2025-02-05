@@ -1,0 +1,88 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 5 Feb 2025 16:16:33 +0100
+Subject: mt76: count stuck TXS
+
+diff --git a/package/kernel/mt76/patches/9999-mt76-count-stuck-TXS.patch b/package/kernel/mt76/patches/9999-mt76-count-stuck-TXS.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e32257f33c72294d5163c72cc4e00529ed06c825
+--- /dev/null
++++ b/package/kernel/mt76/patches/9999-mt76-count-stuck-TXS.patch
+@@ -0,0 +1,78 @@
++From 2ca526532545c776236e6351156a049d8dc88032 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 5 Feb 2025 16:15:45 +0100
++Subject: [PATCH] mt76: count stuck TXS
++
++---
++ mt76.h          | 2 ++
++ mt7915/mac.c    | 8 ++++++++
++ mt7915/mt7915.h | 1 +
++ tx.c            | 3 +++
++ 4 files changed, 14 insertions(+)
++
++--- a/mt76.h
+++++ b/mt76.h
++@@ -976,6 +976,8 @@ struct mt76_dev {
++ 		struct mt76_usb usb;
++ 		struct mt76_sdio sdio;
++ 	};
+++
+++	u64 txs_timeouts;
++ };
++ 
++ /* per-phy stats.  */
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -1935,6 +1935,7 @@ void mt7915_mac_update_stats(struct mt79
++ static void mt7915_mac_severe_check(struct mt7915_phy *phy)
++ {
++ 	struct mt7915_dev *dev = phy->dev;
+++	struct mt76_dev *mdev = &dev->mt76;
++ 	u32 trb;
++ 
++ 	if (!phy->omac_mask)
++@@ -1955,6 +1956,13 @@ static void mt7915_mac_severe_check(stru
++ 				   phy->mt76->band_idx);
++ 
++ 	phy->trb_ts = trb;
+++
+++	/* Check if TXS reports are stuck */
+++	if (mdev->txs_timeouts >= 10 && dev->txs_timeouts != mdev->txs_timeouts) {
+++		/* Indicate TXS reports are stuck. */
+++		dev_warn(dev->mt76.dev, "TXS stuck %lld\n", dev->txs_timeouts);
+++	}
+++	dev->txs_timeouts = mdev->txs_timeouts;
++ }
++ 
++ void mt7915_mac_sta_rc_work(struct work_struct *work)
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -322,6 +322,7 @@ struct mt7915_dev {
++ 	struct reset_control *rstc;
++ 	void __iomem *dcm;
++ 	void __iomem *sku;
+++	u64 txs_timeouts;
++ };
++ 
++ enum {
++--- a/tx.c
+++++ b/tx.c
++@@ -118,12 +118,18 @@ __mt76_tx_status_skb_done(struct mt76_de
++ 		if (!wcid || wcid->txs_failed_cnt < 25) {
++ 			info->flags |= IEEE80211_TX_STAT_ACK;
++ 		}
+++		dev->txs_timeouts++;
++ 	} else if (info->flags & IEEE80211_TX_STAT_ACK) {
++ 		/* Reset station counter */
++ 		if (wcid && wcid->sta)
++ 			wcid->txs_failed_cnt = 0;
++ 	}
++ 
+++
+++	if (!(flags & MT_TX_CB_TXS_FAILED)) {
+++		dev->txs_timeouts = dev->txs_timeouts > 0 ? dev->txs_timeouts - 1 : 0;
+++	}
+++
++ 	__skb_queue_tail(list, skb);
++ }
++ 
