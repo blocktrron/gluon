@@ -1,0 +1,157 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 7 Feb 2025 00:17:02 +0100
+Subject: mt76: import MT7915 recovery fixes
+
+diff --git a/package/kernel/mt76/patches/0003-mt7915-mcu-lower-default-timeout.patch b/package/kernel/mt76/patches/0003-mt7915-mcu-lower-default-timeout.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8a76eae6c65be7a64c724cb1392311878a263eab
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-mt7915-mcu-lower-default-timeout.patch
+@@ -0,0 +1,32 @@
++From e0a9d108036f90527d4f68fe15483c878c9740a6 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 13 Jan 2025 08:48:41 +0100
++Subject: [PATCH 3/5] mt7915: mcu: lower default timeout
++
++The default timeout set in mt76_connac2_mcu_fill_message of 20 seconds
++leads to excessive stalling in case messages are lost.
++
++Testing showed that a much smaller timeout of 3 seconds is sufficient
++in normal operation.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mcu.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 9d790f23..51b6e480 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -197,6 +197,8 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
++ static void
++ mt7915_mcu_set_timeout(struct mt76_dev *mdev, int cmd)
++ {
+++	mdev->mcu.timeout = 5 * HZ;
+++
++ 	if ((cmd & __MCU_CMD_FIELD_ID) != MCU_CMD_EXT_CID)
++ 		return;
++ 
++-- 
++2.47.2
++
+diff --git a/package/kernel/mt76/patches/0004-mt7915-mcu-increase-command-timeout.patch b/package/kernel/mt76/patches/0004-mt7915-mcu-increase-command-timeout.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..046505fb378e8f69dd653bb16951023b08d9c537
+--- /dev/null
++++ b/package/kernel/mt76/patches/0004-mt7915-mcu-increase-command-timeout.patch
+@@ -0,0 +1,48 @@
++From a9d047299d47dc726e2ac61d2874a06f7d27d75a Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 13 Jan 2025 08:51:30 +0100
++Subject: [PATCH 4/5] mt7915: mcu: increase command timeout
++
++Increase the timeout for MCU_EXT_CMD_EFUSE_BUFFER_MODE as
++well as MCU_EXT_CMD_TXBF_ACTION command types.
++
++Regular retries upon hardware-recovery have been observed. Increasing
++the timeout slightly remedies this problem.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mcu.c | 11 +++++++++++
++ 1 file changed, 11 insertions(+)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 51b6e480..ef04c082 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -199,6 +199,14 @@ mt7915_mcu_set_timeout(struct mt76_dev *mdev, int cmd)
++ {
++ 	mdev->mcu.timeout = 5 * HZ;
++ 
+++	switch (cmd) {
+++	case MCU_CMD_PATCH_SEM_CONTROL:
+++		mdev->mcu.timeout = 10 * HZ;
+++		return;
+++	default:
+++		break;
+++	}
+++
++ 	if ((cmd & __MCU_CMD_FIELD_ID) != MCU_CMD_EXT_CID)
++ 		return;
++ 
++@@ -210,6 +218,9 @@ mt7915_mcu_set_timeout(struct mt76_dev *mdev, int cmd)
++ 	case MCU_EXT_CMD_BSS_INFO_UPDATE:
++ 		mdev->mcu.timeout = 2 * HZ;
++ 		return;
+++	case MCU_EXT_CMD_EFUSE_BUFFER_MODE:
+++		mdev->mcu.timeout = 10 * HZ;
+++		return;
++ 	default:
++ 		break;
++ 	}
++-- 
++2.47.2
++
+diff --git a/package/kernel/mt76/patches/0005-mt7915-mcu-re-init-MCU-before-loading-FW-patch.patch b/package/kernel/mt76/patches/0005-mt7915-mcu-re-init-MCU-before-loading-FW-patch.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..54bc526341ccf2b31a2e0f5c79b156d50f5fe765
+--- /dev/null
++++ b/package/kernel/mt76/patches/0005-mt7915-mcu-re-init-MCU-before-loading-FW-patch.patch
+@@ -0,0 +1,55 @@
++From bb79469919afb51df2274d30128153cfda90522e Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 12 Jan 2025 15:30:54 +0100
++Subject: [PATCH 5/5] mt7915: mcu: re-init MCU before loading FW patch
++
++Restart the MCU and release the patch semaphore before loading the MCU
++patch firmware from the host.
++
++This fixes failures upon error recovery in case the semaphore was
++previously taken and never released by the host.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mcu.c | 25 +++++++++++++++----------
++ 1 file changed, 15 insertions(+), 10 deletions(-)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index ef04c082..44f3809a 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -2105,16 +2105,21 @@ static int mt7915_load_firmware(struct mt7915_dev *dev)
++ {
++ 	int ret;
++ 
++-	/* make sure fw is download state */
++-	if (mt7915_firmware_state(dev, false)) {
++-		/* restart firmware once */
++-		mt76_connac_mcu_restart(&dev->mt76);
++-		ret = mt7915_firmware_state(dev, false);
++-		if (ret) {
++-			dev_err(dev->mt76.dev,
++-				"Firmware is not ready for download\n");
++-			return ret;
++-		}
+++	/* Release Semaphore if taken by previous failed attempt */
+++	ret = mt76_connac_mcu_patch_sem_ctrl(&dev->mt76, false);
+++	if (ret != PATCH_REL_SEM_SUCCESS) {
+++		dev_err(dev->mt76.dev, "Could not release semaphore\n");
+++		/* Continue anyways */
+++	}
+++
+++	/* Always restart MCU firmware */
+++	mt76_connac_mcu_restart(&dev->mt76);
+++
+++	/* Check if MCU is ready */
+++	ret = mt7915_firmware_state(dev, false);
+++	if (ret) {
+++		dev_err(dev->mt76.dev, "Firmware did not enter download state\n");
+++		return ret;
++ 	}
++ 
++ 	ret = mt76_connac2_load_patch(&dev->mt76, fw_name_var(dev, ROM_PATCH));
++-- 
++2.47.2
++
