@@ -1,0 +1,75 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 7 Feb 2025 00:43:04 +0100
+Subject: txs
+
+diff --git a/package/kernel/mt76/patches/0006-mt76-count-stuck-TXS.patch b/package/kernel/mt76/patches/0006-mt76-count-stuck-TXS.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..d0665e36b3113b5657129b8fda65f0cc274ac0c9
+--- /dev/null
++++ b/package/kernel/mt76/patches/0006-mt76-count-stuck-TXS.patch
+@@ -0,0 +1,65 @@
++From f5c696ea9be6e3fb0fcf8216a73e1e9e40d3131b Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 5 Feb 2025 16:15:45 +0100
++Subject: [PATCH] mt76: count stuck TXS
++
++---
++ mt76.h            | 2 ++
++ mt76_connac_mac.c | 9 ++++++++-
++ tx.c              | 6 ++++++
++ 3 files changed, 16 insertions(+), 1 deletion(-)
++
++diff --git a/mt76.h b/mt76.h
++index e5a5881e..29a4c9df 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -974,6 +974,8 @@ struct mt76_dev {
++ 		struct mt76_usb usb;
++ 		struct mt76_sdio sdio;
++ 	};
+++
+++	u64 txs_timeouts;
++ };
++ 
++ /* per-phy stats.  */
++diff --git a/mt76_connac_mac.c b/mt76_connac_mac.c
++index e9ac8a73..dea631ca 100644
++--- a/mt76_connac_mac.c
+++++ b/mt76_connac_mac.c
++@@ -747,8 +747,15 @@ bool mt76_connac2_mac_add_txs_skb(struct mt76_dev *dev, struct mt76_wcid *wcid,
++ 	if (skb) {
++ 		struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
++ 
++-		if (!(le32_to_cpu(txs_data[0]) & MT_TXS0_ACK_ERROR_MASK))
+++		if (!(le32_to_cpu(txs_data[0]) & MT_TXS0_ACK_ERROR_MASK)) {
++ 			info->flags |= IEEE80211_TX_STAT_ACK;
+++			dev->txs_timeouts = dev->txs_timeouts ? dev->txs_timeouts - 1 : 0;
+++		} else {
+++			dev->txs_timeouts++;
+++			if (dev->txs_timeouts > 10) {
+++				dev_warn(dev->dev, "txs timeout %lld\n", dev->txs_timeouts);
+++			}
+++		}
++ 
++ 		info->status.ampdu_len = 1;
++ 		info->status.ampdu_ack_len =
++diff --git a/tx.c b/tx.c
++index af0c50c9..ac1c9ed9 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -107,6 +107,12 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 	}
++ 
++ 	__skb_queue_tail(list, skb);
+++
+++	if (flags & MT_TX_CB_TXS_FAILED) {
+++		dev->txs_timeouts++;
+++		if (dev->txs_timeouts > 10)
+++			dev_warn(dev->dev, "txs timeout %lld\n", dev->txs_timeouts);
+++	}
++ }
++ 
++ void
++-- 
++2.47.2
++
