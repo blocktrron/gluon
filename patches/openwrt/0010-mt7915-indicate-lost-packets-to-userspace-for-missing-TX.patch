@@ -1,0 +1,303 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 9 Nov 2025 02:39:59 +0100
+Subject: mt7915: indicate lost packets to userspace for missing TX
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e71468cb7375a24cbdeb87a4e62b1eb6187db2ff
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+@@ -0,0 +1,291 @@
++From 42b75d9ede264f3efccb98745b01db847778654d Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 3 Nov 2025 18:47:27 +0100
++Subject: [PATCH] mt7915: indicate lost packets to userspace for missing TX
++ Free
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ dma.c             |  1 +
++ mt76.h            |  8 ++++++
++ mt76_connac.h     |  2 ++
++ mt76_connac_mac.c | 14 +++++++++++
++ mt7915/init.c     |  2 ++
++ mt7915/mac.c      | 64 ++++++++++++++++++++++++++++++++++++++++++++++-
++ mt7915/main.c     |  1 +
++ mt7915/mmio.c     |  1 +
++ mt7915/mt7915.h   |  1 +
++ tx.c              |  3 +++
++ 10 files changed, 96 insertions(+), 1 deletion(-)
++
++diff --git a/dma.c b/dma.c
++index 1fa7de1d..514ab45a 100644
++--- a/dma.c
+++++ b/dma.c
++@@ -139,6 +139,7 @@ mt76_put_txwi(struct mt76_dev *dev, struct mt76_txwi_cache *t)
++ 		return;
++ 
++ 	spin_lock(&dev->lock);
+++	t->jiffies = 0;
++ 	list_add(&t->list, &dev->txwi_cache);
++ 	spin_unlock(&dev->lock);
++ }
++diff --git a/mt76.h b/mt76.h
++index f5051b28..3e8c59bd 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -398,6 +398,8 @@ struct mt76_wcid {
++ 	u32 tx_info;
++ 	bool sw_iv;
++ 
+++	unsigned long last_txwi_loss_jiffies;
+++
++ 	struct list_head tx_list;
++ 	struct sk_buff_head tx_pending;
++ 	struct sk_buff_head tx_offchannel;
++@@ -442,6 +444,7 @@ struct mt76_txwi_cache {
++ 	};
++ 
++ 	u8 qid;
+++	unsigned long jiffies;
++ };
++ 
++ struct mt76_rx_tid {
++@@ -548,6 +551,9 @@ struct mt76_driver_ops {
++ 
++ 	void (*tx_complete_skb)(struct mt76_dev *dev,
++ 				struct mt76_queue_entry *e);
+++	
+++	void (*tx_complete_txwi)(struct mt76_dev *dev,
+++				struct mt76_queue_entry *e);
++ 
++ 	bool (*tx_status_data)(struct mt76_dev *dev, u8 *update);
++ 
++@@ -881,6 +887,8 @@ struct mt76_phy {
++ #endif
++ 
++ 	struct delayed_work mac_work;
+++	struct delayed_work txwi_loss_work;
+++	u8 loss_work_pending;
++ 	u8 mac_work_count;
++ 
++ 	struct {
++diff --git a/mt76_connac.h b/mt76_connac.h
++index 192dcc37..418c66a3 100644
++--- a/mt76_connac.h
+++++ b/mt76_connac.h
++@@ -421,6 +421,8 @@ void mt76_connac_txp_skb_unmap(struct mt76_dev *dev,
++ 			       struct mt76_txwi_cache *txwi);
++ void mt76_connac_tx_complete_skb(struct mt76_dev *mdev,
++ 				 struct mt76_queue_entry *e);
+++void mt76_connac_tx_complete_txwi(struct mt76_dev *mdev,
+++				 struct mt76_queue_entry *e);
++ void mt76_connac_pm_queue_skb(struct ieee80211_hw *hw,
++ 			      struct mt76_connac_pm *pm,
++ 			      struct mt76_wcid *wcid,
++diff --git a/mt76_connac_mac.c b/mt76_connac_mac.c
++index 0db00efe..62b5b566 100644
++--- a/mt76_connac_mac.c
+++++ b/mt76_connac_mac.c
++@@ -159,6 +159,20 @@ void mt76_connac_tx_complete_skb(struct mt76_dev *mdev,
++ }
++ EXPORT_SYMBOL_GPL(mt76_connac_tx_complete_skb);
++ 
+++void mt76_connac_tx_complete_txwi(struct mt76_dev *mdev,
+++				 struct mt76_queue_entry *e)
+++{
+++	if (!e->txwi)
+++		return;
+++	
+++	if (e->wcid == 0xffff)
+++		return;
+++
+++	/* Mark txwi as completed by firmware */
+++	e->txwi->jiffies = jiffies;
+++}
+++EXPORT_SYMBOL_GPL(mt76_connac_tx_complete_txwi);
+++
++ void mt76_connac_write_hw_txp(struct mt76_dev *dev,
++ 			      struct mt76_tx_info *tx_info,
++ 			      void *txp_ptr, u32 id)
++diff --git a/mt7915/init.c b/mt7915/init.c
++index 3eae4b9c..3bc1dab0 100644
++--- a/mt7915/init.c
+++++ b/mt7915/init.c
++@@ -691,6 +691,7 @@ mt7915_register_ext_phy(struct mt7915_dev *dev, struct mt7915_phy *phy)
++ 	int ret;
++ 
++ 	INIT_DELAYED_WORK(&mphy->mac_work, mt7915_mac_work);
+++	INIT_DELAYED_WORK(&mphy->txwi_loss_work, mt7915_txwi_loss_work);
++ 
++ 	mt7915_eeprom_parse_hw_cap(dev, phy);
++ 
++@@ -1223,6 +1224,7 @@ int mt7915_register_device(struct mt7915_dev *dev)
++ 	dev->mt76.phy.priv = &dev->phy;
++ 	INIT_WORK(&dev->rc_work, mt7915_mac_sta_rc_work);
++ 	INIT_DELAYED_WORK(&dev->mphy.mac_work, mt7915_mac_work);
+++	INIT_DELAYED_WORK(&dev->mphy.txwi_loss_work, mt7915_txwi_loss_work);
++ 	INIT_LIST_HEAD(&dev->sta_rc_list);
++ 	INIT_LIST_HEAD(&dev->twt_list);
++ 
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index 1c0d3101..18fc1eaa 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -1448,8 +1448,11 @@ mt7915_mac_full_reset(struct mt7915_dev *dev)
++ 		ieee80211_stop_queues(ext_phy->hw);
++ 
++ 	cancel_delayed_work_sync(&dev->mphy.mac_work);
++-	if (ext_phy)
+++	cancel_delayed_work_sync(&dev->mphy.txwi_loss_work);
+++	if (ext_phy) {
++ 		cancel_delayed_work_sync(&ext_phy->mac_work);
+++		cancel_delayed_work_sync(&ext_phy->txwi_loss_work);
+++	}
++ 
++ 	mutex_lock(&dev->mt76.mutex);
++ 	for (i = 0; i < 10; i++) {
++@@ -1529,9 +1532,11 @@ void mt7915_mac_reset_work(struct work_struct *work)
++ 	set_bit(MT76_MCU_RESET, &dev->mphy.state);
++ 	wake_up(&dev->mt76.mcu.wait);
++ 	cancel_delayed_work_sync(&dev->mphy.mac_work);
+++	cancel_delayed_work_sync(&dev->mphy.txwi_loss_work);
++ 	if (phy2) {
++ 		set_bit(MT76_RESET, &phy2->mt76->state);
++ 		cancel_delayed_work_sync(&phy2->mt76->mac_work);
+++		cancel_delayed_work_sync(&phy2->mt76->txwi_loss_work);
++ 	}
++ 
++ 	mutex_lock(&dev->mt76.mutex);
++@@ -1994,14 +1999,65 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ }
++ 
+++void mt7915_txwi_loss_work(struct work_struct *work)
+++{
+++	struct mt76_phy *mphy = container_of(work, struct mt76_phy, txwi_loss_work.work);
+++	struct mt76_dev *mdev = mphy->dev;
+++
+++	/* Check pending txwi */
+++	struct mt76_txwi_cache *txwi;
+++	struct mt76_wcid *wcid;
+++	struct ieee80211_sta *sta;
+++	int id;
+++
+++	spin_lock_bh(&mdev->token_lock);
+++	idr_for_each_entry(&mdev->token, txwi, id) {
+++		rcu_read_lock();
+++		if (!txwi->jiffies)
+++			continue;
+++		
+++		if (!txwi->skb)
+++			continue;
+++		
+++		if (time_is_after_jiffies(txwi->jiffies + 5 * HZ))
+++			continue;
+++		
+++		struct mt76_tx_cb *cb = mt76_tx_skb_cb(txwi->skb);
+++		if (cb->pktid < MT_PACKET_ID_FIRST)
+++			continue;
+++		
+++		wcid = __mt76_wcid_ptr(mdev, cb->wcid);
+++		if (!wcid)
+++			continue;
+++		
+++		if (wcid->last_txwi_loss_jiffies && time_is_after_jiffies(wcid->last_txwi_loss_jiffies + 10 * HZ))
+++			continue;
+++		
+++		dev_warn(mdev->dev, "txwi timeout token %d pktid %d wcid-skb %d\n", id, cb->pktid, cb->wcid);
+++
+++		sta = wcid_to_sta(wcid);
+++		if (sta) {
+++			ieee80211_report_low_ack(sta, 10);
+++		}
+++		wcid->last_txwi_loss_jiffies = jiffies;
+++
+++		rcu_read_unlock();
+++	}
+++	spin_unlock_bh(&mdev->token_lock);
+++	
+++	mphy->loss_work_pending = false;
+++}
+++
++ void mt7915_mac_work(struct work_struct *work)
++ {
++ 	struct mt7915_phy *phy;
++ 	struct mt76_phy *mphy;
+++	struct mt76_dev *mdev;
++ 
++ 	mphy = (struct mt76_phy *)container_of(work, struct mt76_phy,
++ 					       mac_work.work);
++ 	phy = mphy->priv;
+++	mdev = mphy->dev;
++ 
++ 	mutex_lock(&mphy->dev->mutex);
++ 
++@@ -2014,6 +2070,12 @@ void mt7915_mac_work(struct work_struct *work)
++ 
++ 		if (phy->dev->muru_debug)
++ 			mt7915_mcu_muru_debug_get(phy);
+++		
+++		if (!mphy->loss_work_pending) {
+++			mphy->loss_work_pending = true;
+++			ieee80211_queue_delayed_work(mphy->hw, &mphy->txwi_loss_work,
+++				     MT7915_WATCHDOG_TIME);
+++		}
++ 	}
++ 
++ 	mutex_unlock(&mphy->dev->mutex);
++diff --git a/mt7915/main.c b/mt7915/main.c
++index 3aa31c5c..f41e2dd3 100644
++--- a/mt7915/main.c
+++++ b/mt7915/main.c
++@@ -114,6 +114,7 @@ static void mt7915_stop(struct ieee80211_hw *hw, bool suspend)
++ 	struct mt7915_phy *phy = mt7915_hw_phy(hw);
++ 
++ 	cancel_delayed_work_sync(&phy->mt76->mac_work);
+++	cancel_delayed_work_sync(&phy->mt76->txwi_loss_work);
++ 
++ 	mutex_lock(&dev->mt76.mutex);
++ 
++diff --git a/mt7915/mmio.c b/mt7915/mmio.c
++index 36488aa6..ea6d18ea 100644
++--- a/mt7915/mmio.c
+++++ b/mt7915/mmio.c
++@@ -928,6 +928,7 @@ struct mt7915_dev *mt7915_mmio_probe(struct device *pdev,
++ 		.token_size = MT7915_TOKEN_SIZE,
++ 		.tx_prepare_skb = mt7915_tx_prepare_skb,
++ 		.tx_complete_skb = mt76_connac_tx_complete_skb,
+++		.tx_complete_txwi = mt76_connac_tx_complete_txwi,
++ 		.rx_skb = mt7915_queue_rx_skb,
++ 		.rx_check = mt7915_rx_check,
++ 		.rx_poll_complete = mt7915_rx_poll_complete,
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index 2e94347c..e5ad92b1 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -576,6 +576,7 @@ int mt7915_mac_sta_event(struct mt76_dev *mdev, struct ieee80211_vif *vif,
++ 			 struct ieee80211_sta *sta, enum mt76_sta_event ev);
++ void mt7915_mac_sta_remove(struct mt76_dev *mdev, struct ieee80211_vif *vif,
++ 			   struct ieee80211_sta *sta);
+++void mt7915_txwi_loss_work(struct work_struct *work);
++ void mt7915_mac_work(struct work_struct *work);
++ void mt7915_mac_reset_work(struct work_struct *work);
++ void mt7915_mac_dump_work(struct work_struct *work);
++diff --git a/tx.c b/tx.c
++index b78ae6a3..e8656c66 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -807,6 +807,9 @@ void mt76_queue_tx_complete(struct mt76_dev *dev, struct mt76_queue *q,
++ {
++ 	if (e->skb)
++ 		dev->drv->tx_complete_skb(dev, e);
+++	
+++	if (e->txwi && dev->drv->tx_complete_txwi)
+++		dev->drv->tx_complete_txwi(dev, e);
++ 
++ 	spin_lock_bh(&q->lock);
++ 	q->tail = (q->tail + 1) % q->ndesc;
++-- 
++2.51.0
++
