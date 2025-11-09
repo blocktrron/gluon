@@ -1,0 +1,202 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 9 Nov 2025 20:49:51 +0100
+Subject: workaround
+
+Signed-off-by: David Bauer <mail@david-bauer.net>
+
+diff --git a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+index e71468cb7375a24cbdeb87a4e62b1eb6187db2ff..a90545821f4e0e7da89f52a88b8f0803cfa8dd22 100644
+--- a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
++++ b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+@@ -1,7 +1,7 @@
+ From 42b75d9ede264f3efccb98745b01db847778654d Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Mon, 3 Nov 2025 18:47:27 +0100
+-Subject: [PATCH] mt7915: indicate lost packets to userspace for missing TX
++Subject: [PATCH 1/2] mt7915: indicate lost packets to userspace for missing TX
+  Free
+ 
+ Signed-off-by: David Bauer <mail@david-bauer.net>
+diff --git a/package/kernel/mt76/patches/0002-workaround.patch b/package/kernel/mt76/patches/0002-workaround.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..2193a24e5e70d3209353ed506806a5a391c200b7
+--- /dev/null
++++ b/package/kernel/mt76/patches/0002-workaround.patch
+@@ -0,0 +1,177 @@
++From 5d7ed41fa20b1a185fc87a6559bbf5fc93cd7500 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 9 Nov 2025 20:33:10 +0100
++Subject: [PATCH 2/2] workaround
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mac.c  | 95 +++++++++++++++++++++++++++++++++++++++++++++++++--
++ mt7915/regs.h | 14 ++++++++
++ 2 files changed, 107 insertions(+), 2 deletions(-)
++
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index 18fc1eaa..871f2968 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -876,6 +876,23 @@ mt7915_mac_tx_free_done(struct mt7915_dev *dev,
++ 	}
++ }
++ 
+++static void
+++mt7915_print_free_event(struct mt7915_dev *dev, struct mt76_txwi_cache *txwi)
+++{
+++	struct mt76_dev *mdev = &dev->mt76;
+++
+++	if (!txwi->skb)
+++		return;
+++	struct mt76_tx_cb *cb = mt76_tx_skb_cb(txwi->skb);
+++
+++	if (!cb->wcid)
+++		return;
+++
+++	dev_warn(mdev->dev,
+++		 "Freeing wcid=%d pktid=%d tokens=%d\n",
+++		 cb->wcid, cb->pktid, mdev->token_count);
+++}
+++
++ static void
++ mt7915_mac_tx_free(struct mt7915_dev *dev, void *data, int len)
++ {
++@@ -958,6 +975,7 @@ mt7915_mac_tx_free(struct mt7915_dev *dev, void *data, int len)
++ 			if (!txwi)
++ 				continue;
++ 
+++			mt7915_print_free_event(dev, txwi);
++ 			mt76_connac2_txwi_free(mdev, txwi, sta, &free_list);
++ 		}
++ 	}
++@@ -990,6 +1008,7 @@ mt7915_mac_tx_free_v0(struct mt7915_dev *dev, void *data, int len)
++ 		if (!txwi)
++ 			continue;
++ 
+++		mt7915_print_free_event(dev, txwi);
++ 		mt76_connac2_txwi_free(mdev, txwi, NULL, &free_list);
++ 	}
++ 
++@@ -1999,6 +2018,78 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ }
++ 
+++static void mt7915_purge_ac(struct ieee80211_sta *sta, int ac, int fid_start, int fid_end) {
+++	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+++	struct mt7915_dev *dev = msta->vif->phy->dev;
+++	struct mt76_dev *mdev = &dev->mt76;
+++
+++	u32 q0_ctrl, q2_ctrl, q3_ctrl;
+++	u32 deq_ctrl[4];
+++	u32 head_frame_id, tail_frame_id;
+++	int random_drop = 2;
+++
+++	deq_ctrl[0] = BIT(31) | BIT(11) | (ac << 24) | msta->wcid.idx | FIELD_PREP(MT_PLE_DEQ_0_DEQ_SUB_TYPE, 0x2);
+++
+++	if (random_drop == 2) {
+++		deq_ctrl[0] |= FIELD_PREP(MT_PLE_DEQ_0_ENQ_SUB_TYPE, 0x1);
+++		deq_ctrl[0] |= MT_PLE_DEQ_0_ENQ_VALID;
+++	}
+++	deq_ctrl[1] = FIELD_PREP(MT_PLE_DEQ_1_FID_START, fid_start);
+++	deq_ctrl[1] |= FIELD_PREP(MT_PLE_DEQ_1_FID_END, fid_end);
+++	deq_ctrl[2] = FIELD_PREP(MT_PLE_DEQ_2_DST_QID, 0x1f);
+++
+++
+++	mt76_wr(dev, MT_PLE_DEQ(1), deq_ctrl[1]);
+++	mt76_wr(dev, MT_PLE_DEQ(2), deq_ctrl[2]);
+++	mt76_wr(dev, MT_PLE_DEQ(0), deq_ctrl[0]);
+++	deq_ctrl[3] = mt76_rr(dev, MT_PLE_DEQ(3));
+++
+++	dev_warn(mdev->dev, "STA %pM AC %d PLE purge done head=0x%08lx tail=0x%08lx empty=0x%08lx\n",
+++			sta->addr, ac, FIELD_GET(MT_PLE_DEQ_3_HEAD_FID, deq_ctrl[3]), FIELD_GET(MT_PLE_DEQ_3_TAIL_FID, deq_ctrl[3]), FIELD_GET(MT_PLE_DEQ_3_EMPTY, deq_ctrl[3]));
+++
+++	q0_ctrl = BIT(31) | BIT(11) | (ac << 24);
+++	mt76_wr(dev, MT_FL_Q0_CTRL, q0_ctrl | msta->wcid.idx);
+++	q2_ctrl = mt76_rr(dev, MT_FL_Q2_CTRL);
+++	q3_ctrl = mt76_rr(dev, MT_FL_Q3_CTRL);
+++	head_frame_id = FIELD_GET(MT_FL_Q2_CTRL_HFID, q2_ctrl);
+++	tail_frame_id = FIELD_GET(MT_FL_Q2_CTRL_TFID, q2_ctrl);
+++	dev_warn(mdev->dev, "STA %pM AC %d after purge head %d tail %d qlen %ld\n",
+++			sta->addr, ac, head_frame_id, tail_frame_id,
+++			FIELD_GET(GENMASK(11, 0), q3_ctrl));
+++}
+++
+++static void mt7915_ple_purge(struct ieee80211_sta *sta) {
+++	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+++	struct mt7915_dev *dev = msta->vif->phy->dev;
+++	struct mt76_dev *mdev = &dev->mt76;
+++
+++	u32 q0_ctrl, q2_ctrl, q3_ctrl;
+++	u32 qlen;
+++	u32 head_frame_id, tail_frame_id;
+++
+++	for (int ac = 0; ac < 4; ac++) {
+++		int i = 64;
+++		do {
+++			q0_ctrl = BIT(31) | BIT(11) | (ac << 24);
+++			mt76_wr(dev, MT_FL_Q0_CTRL, q0_ctrl | msta->wcid.idx);
+++			q2_ctrl = mt76_rr(dev, MT_FL_Q2_CTRL);
+++			q3_ctrl = mt76_rr(dev, MT_FL_Q3_CTRL);
+++			head_frame_id = FIELD_GET(MT_FL_Q2_CTRL_HFID, q2_ctrl);
+++			tail_frame_id = FIELD_GET(MT_FL_Q2_CTRL_TFID, q2_ctrl);
+++			qlen = FIELD_GET(GENMASK(11, 0), q3_ctrl);
+++
+++			if (qlen == 0)
+++				break;
+++
+++			dev_warn(mdev->dev, "STA %pM AC %d head %d tail %d qlen %d token %d\n",
+++					sta->addr, ac, head_frame_id, tail_frame_id,
+++					qlen, mdev->token_count);
+++			
+++			mt7915_purge_ac(sta, ac, head_frame_id, tail_frame_id);
+++		} while (--i > 0);
+++	}
+++}
+++
++ void mt7915_txwi_loss_work(struct work_struct *work)
++ {
++ 	struct mt76_phy *mphy = container_of(work, struct mt76_phy, txwi_loss_work.work);
++@@ -2034,10 +2125,10 @@ void mt7915_txwi_loss_work(struct work_struct *work)
++ 			continue;
++ 		
++ 		dev_warn(mdev->dev, "txwi timeout token %d pktid %d wcid-skb %d\n", id, cb->pktid, cb->wcid);
++-
++ 		sta = wcid_to_sta(wcid);
++ 		if (sta) {
++-			ieee80211_report_low_ack(sta, 10);
+++			mt7915_ple_purge(sta);
+++			// ieee80211_report_low_ack(sta, 10);
++ 		}
++ 		wcid->last_txwi_loss_jiffies = jiffies;
++ 
++diff --git a/mt7915/regs.h b/mt7915/regs.h
++index c5ec63a2..40caa827 100644
++--- a/mt7915/regs.h
+++++ b/mt7915/regs.h
++@@ -152,8 +152,22 @@ enum offs_rev {
++ #define MT_FL_Q_EMPTY			MT_PLE(__OFFS(PLE_FL_Q_EMPTY))
++ #define MT_FL_Q0_CTRL			MT_PLE(__OFFS(PLE_FL_Q_CTRL))
++ #define MT_FL_Q2_CTRL			MT_PLE(__OFFS(PLE_FL_Q_CTRL) + 0x8)
+++#define MT_FL_Q2_CTRL_HFID		GENMASK(11, 0)
+++#define MT_FL_Q2_CTRL_TFID		GENMASK(27, 16)
++ #define MT_FL_Q3_CTRL			MT_PLE(__OFFS(PLE_FL_Q_CTRL) + 0xc)
++ 
+++#define MT_PLE_ENQ(idx)				MT_PLE(0x60 + (idx * 4))
+++#define MT_PLE_DEQ(idx)				MT_PLE(0x80 + (idx * 4))
+++#define MT_PLE_DEQ_0_DEQ_SUB_TYPE	GENMASK(19, 16)
+++#define MT_PLE_DEQ_0_ENQ_SUB_TYPE	GENMASK(22, 20)
+++#define MT_PLE_DEQ_0_ENQ_VALID		BIT(23)
+++#define MT_PLE_DEQ_1_FID_START	GENMASK(11, 0)
+++#define MT_PLE_DEQ_1_FID_END	GENMASK(27, 16)
+++#define MT_PLE_DEQ_2_DST_QID	GENMASK(30, 24)
+++#define MT_PLE_DEQ_3_HEAD_FID	GENMASK(11, 0)
+++#define MT_PLE_DEQ_3_EMPTY		BIT(15)
+++#define MT_PLE_DEQ_3_TAIL_FID	GENMASK(27, 16)
+++
++ #define MT_PLE_FREEPG_CNT		MT_PLE(__OFFS(PLE_FREEPG_CNT))
++ #define MT_PLE_FREEPG_HEAD_TAIL		MT_PLE(__OFFS(PLE_FREEPG_HEAD_TAIL))
++ #define MT_PLE_PG_HIF_GROUP		MT_PLE(__OFFS(PLE_PG_HIF_GROUP))
++-- 
++2.51.0
++
