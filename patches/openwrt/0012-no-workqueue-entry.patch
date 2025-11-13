@@ -1,0 +1,193 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 13 Nov 2025 12:26:02 +0100
+Subject: no workqueue entry
+
+diff --git a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+index a90545821f4e0e7da89f52a88b8f0803cfa8dd22..5f6f6dabbaafba08ff187eea26ff38a71f1cfe2d 100644
+--- a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
++++ b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+@@ -1,7 +1,7 @@
+-From 42b75d9ede264f3efccb98745b01db847778654d Mon Sep 17 00:00:00 2001
++From ff38371c0fef4f3c76a34ec995911923b1a7d736 Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Mon, 3 Nov 2025 18:47:27 +0100
+-Subject: [PATCH 1/2] mt7915: indicate lost packets to userspace for missing TX
++Subject: [PATCH 1/3] mt7915: indicate lost packets to userspace for missing TX
+  Free
+ 
+ Signed-off-by: David Bauer <mail@david-bauer.net>
+diff --git a/package/kernel/mt76/patches/0002-workaround.patch b/package/kernel/mt76/patches/0002-workaround.patch
+index 2193a24e5e70d3209353ed506806a5a391c200b7..e1c4ad8e35ffaa6cf65e4c06c3aa6b9a3dc47ec2 100644
+--- a/package/kernel/mt76/patches/0002-workaround.patch
++++ b/package/kernel/mt76/patches/0002-workaround.patch
+@@ -1,7 +1,7 @@
+-From 5d7ed41fa20b1a185fc87a6559bbf5fc93cd7500 Mon Sep 17 00:00:00 2001
++From 7b3eaadd3c11a103578dcf5c7fdcc5b27d6588ca Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Sun, 9 Nov 2025 20:33:10 +0100
+-Subject: [PATCH 2/2] workaround
++Subject: [PATCH 2/3] workaround
+ 
+ Signed-off-by: David Bauer <mail@david-bauer.net>
+ ---
+diff --git a/package/kernel/mt76/patches/0003-no-workqueue-entry.patch b/package/kernel/mt76/patches/0003-no-workqueue-entry.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..370f6aa104d674957f99ce679f46b0fdeaf3ad07
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-no-workqueue-entry.patch
+@@ -0,0 +1,155 @@
++From 9af196b1e67c622e99c7700831f571aa0285aaaf Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Thu, 13 Nov 2025 12:25:45 +0100
++Subject: [PATCH 3/3] no workqueue entry
++
++---
++ mt76.h          |  3 +--
++ mt7915/init.c   |  2 --
++ mt7915/mac.c    | 20 ++++++--------------
++ mt7915/main.c   |  1 -
++ mt7915/mt7915.h |  3 ++-
++ 5 files changed, 9 insertions(+), 20 deletions(-)
++
++diff --git a/mt76.h b/mt76.h
++index 3e8c59bd..6aaf0204 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -887,9 +887,8 @@ struct mt76_phy {
++ #endif
++ 
++ 	struct delayed_work mac_work;
++-	struct delayed_work txwi_loss_work;
++-	u8 loss_work_pending;
++ 	u8 mac_work_count;
+++	unsigned long ple_loss_jiffies;
++ 
++ 	struct {
++ 		struct sk_buff *head;
++diff --git a/mt7915/init.c b/mt7915/init.c
++index 3bc1dab0..3eae4b9c 100644
++--- a/mt7915/init.c
+++++ b/mt7915/init.c
++@@ -691,7 +691,6 @@ mt7915_register_ext_phy(struct mt7915_dev *dev, struct mt7915_phy *phy)
++ 	int ret;
++ 
++ 	INIT_DELAYED_WORK(&mphy->mac_work, mt7915_mac_work);
++-	INIT_DELAYED_WORK(&mphy->txwi_loss_work, mt7915_txwi_loss_work);
++ 
++ 	mt7915_eeprom_parse_hw_cap(dev, phy);
++ 
++@@ -1224,7 +1223,6 @@ int mt7915_register_device(struct mt7915_dev *dev)
++ 	dev->mt76.phy.priv = &dev->phy;
++ 	INIT_WORK(&dev->rc_work, mt7915_mac_sta_rc_work);
++ 	INIT_DELAYED_WORK(&dev->mphy.mac_work, mt7915_mac_work);
++-	INIT_DELAYED_WORK(&dev->mphy.txwi_loss_work, mt7915_txwi_loss_work);
++ 	INIT_LIST_HEAD(&dev->sta_rc_list);
++ 	INIT_LIST_HEAD(&dev->twt_list);
++ 
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index 871f2968..2bf3c986 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -1467,10 +1467,8 @@ mt7915_mac_full_reset(struct mt7915_dev *dev)
++ 		ieee80211_stop_queues(ext_phy->hw);
++ 
++ 	cancel_delayed_work_sync(&dev->mphy.mac_work);
++-	cancel_delayed_work_sync(&dev->mphy.txwi_loss_work);
++ 	if (ext_phy) {
++ 		cancel_delayed_work_sync(&ext_phy->mac_work);
++-		cancel_delayed_work_sync(&ext_phy->txwi_loss_work);
++ 	}
++ 
++ 	mutex_lock(&dev->mt76.mutex);
++@@ -1551,11 +1549,9 @@ void mt7915_mac_reset_work(struct work_struct *work)
++ 	set_bit(MT76_MCU_RESET, &dev->mphy.state);
++ 	wake_up(&dev->mt76.mcu.wait);
++ 	cancel_delayed_work_sync(&dev->mphy.mac_work);
++-	cancel_delayed_work_sync(&dev->mphy.txwi_loss_work);
++ 	if (phy2) {
++ 		set_bit(MT76_RESET, &phy2->mt76->state);
++ 		cancel_delayed_work_sync(&phy2->mt76->mac_work);
++-		cancel_delayed_work_sync(&phy2->mt76->txwi_loss_work);
++ 	}
++ 
++ 	mutex_lock(&dev->mt76.mutex);
++@@ -2090,9 +2086,8 @@ static void mt7915_ple_purge(struct ieee80211_sta *sta) {
++ 	}
++ }
++ 
++-void mt7915_txwi_loss_work(struct work_struct *work)
+++static void mt7915_txwi_loss_work(struct mt76_phy *mphy)
++ {
++-	struct mt76_phy *mphy = container_of(work, struct mt76_phy, txwi_loss_work.work);
++ 	struct mt76_dev *mdev = mphy->dev;
++ 
++ 	/* Check pending txwi */
++@@ -2135,8 +2130,6 @@ void mt7915_txwi_loss_work(struct work_struct *work)
++ 		rcu_read_unlock();
++ 	}
++ 	spin_unlock_bh(&mdev->token_lock);
++-	
++-	mphy->loss_work_pending = false;
++ }
++ 
++ void mt7915_mac_work(struct work_struct *work)
++@@ -2161,18 +2154,17 @@ void mt7915_mac_work(struct work_struct *work)
++ 
++ 		if (phy->dev->muru_debug)
++ 			mt7915_mcu_muru_debug_get(phy);
++-		
++-		if (!mphy->loss_work_pending) {
++-			mphy->loss_work_pending = true;
++-			ieee80211_queue_delayed_work(mphy->hw, &mphy->txwi_loss_work,
++-				     MT7915_WATCHDOG_TIME);
++-		}
++ 	}
++ 
++ 	mutex_unlock(&mphy->dev->mutex);
++ 
++ 	mt76_tx_status_check(mphy->dev, false);
++ 
+++	if (!time_is_after_jiffies(phy->last_txwi_loss_check + HZ)) {
+++		mt7915_txwi_loss_work(mphy);
+++		phy->last_txwi_loss_check = jiffies;
+++	}
+++
++ 	ieee80211_queue_delayed_work(mphy->hw, &mphy->mac_work,
++ 				     MT7915_WATCHDOG_TIME);
++ }
++diff --git a/mt7915/main.c b/mt7915/main.c
++index f41e2dd3..3aa31c5c 100644
++--- a/mt7915/main.c
+++++ b/mt7915/main.c
++@@ -114,7 +114,6 @@ static void mt7915_stop(struct ieee80211_hw *hw, bool suspend)
++ 	struct mt7915_phy *phy = mt7915_hw_phy(hw);
++ 
++ 	cancel_delayed_work_sync(&phy->mt76->mac_work);
++-	cancel_delayed_work_sync(&phy->mt76->txwi_loss_work);
++ 
++ 	mutex_lock(&dev->mt76.mutex);
++ 
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index e5ad92b1..f910e6bb 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -220,6 +220,8 @@ struct mt7915_phy {
++ 	u32 rx_ampdu_ts;
++ 	u32 ampdu_ref;
++ 
+++	unsigned long last_txwi_loss_check;
+++
++ 	struct mt76_mib_stats mib;
++ 	struct mt76_channel_state state_ts;
++ 
++@@ -576,7 +578,6 @@ int mt7915_mac_sta_event(struct mt76_dev *mdev, struct ieee80211_vif *vif,
++ 			 struct ieee80211_sta *sta, enum mt76_sta_event ev);
++ void mt7915_mac_sta_remove(struct mt76_dev *mdev, struct ieee80211_vif *vif,
++ 			   struct ieee80211_sta *sta);
++-void mt7915_txwi_loss_work(struct work_struct *work);
++ void mt7915_mac_work(struct work_struct *work);
++ void mt7915_mac_reset_work(struct work_struct *work);
++ void mt7915_mac_dump_work(struct work_struct *work);
++-- 
++2.51.0
++
