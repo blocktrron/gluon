@@ -1,0 +1,62 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 14 Nov 2025 16:12:24 +0100
+Subject: bla
+
+diff --git a/package/kernel/mt76/patches/0005-use-polling.patch b/package/kernel/mt76/patches/0005-use-polling.patch
+index 859d3adca494bd2b7897381239e326424797f7a7..dad660bd035f377f58ccc8664ffd072787107c2a 100644
+--- a/package/kernel/mt76/patches/0005-use-polling.patch
++++ b/package/kernel/mt76/patches/0005-use-polling.patch
+@@ -1,15 +1,15 @@
+-From 2e4ca7f85fec2fd9ed242a598f5cc19b66c93828 Mon Sep 17 00:00:00 2001
++From 92a55f2c6946c2f53e416a6a16224222f0567ff3 Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Fri, 14 Nov 2025 13:22:19 +0100
+ Subject: [PATCH 5/6] use polling
+ 
+ ---
+- mt7915/mac.c    | 169 +++++++++++++++++++++++++++---------------------
++ mt7915/mac.c    | 168 +++++++++++++++++++++++++++---------------------
+  mt7915/mt7915.h |  10 ++-
+- 2 files changed, 104 insertions(+), 75 deletions(-)
++ 2 files changed, 103 insertions(+), 75 deletions(-)
+ 
+ diff --git a/mt7915/mac.c b/mt7915/mac.c
+-index 459d39dc..3fe65137 100644
++index 459d39dc..6e7a0627 100644
+ --- a/mt7915/mac.c
+ +++ b/mt7915/mac.c
+ @@ -2014,14 +2014,36 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
+@@ -214,13 +214,12 @@ index 459d39dc..3fe65137 100644
+  }
+  
+  void mt7915_mac_work(struct work_struct *work)
+-@@ -2160,9 +2180,10 @@ void mt7915_mac_work(struct work_struct *work)
++@@ -2160,9 +2180,9 @@ void mt7915_mac_work(struct work_struct *work)
+  
+  	mt76_tx_status_check(mphy->dev, false);
+  
+ -	if (!time_is_after_jiffies(phy->last_txwi_loss_check + HZ)) {
+ +	if (++phy->stuck_queue_check >= 5) {
+-+		dev_warn(mdev->dev, "Checking for TXWI loss\n");
+  		mt7915_txwi_loss_work(mphy);
+ -		phy->last_txwi_loss_check = jiffies;
+ +		phy->stuck_queue_check = 0;
+diff --git a/package/kernel/mt76/patches/0006-disable-free-print.patch b/package/kernel/mt76/patches/0006-disable-free-print.patch
+index e4934075a2ebc33d86e08d8f60e933c2c267304f..57e6f8bc10d6e9827d8a1c485619d93d19e7e210 100644
+--- a/package/kernel/mt76/patches/0006-disable-free-print.patch
++++ b/package/kernel/mt76/patches/0006-disable-free-print.patch
+@@ -1,4 +1,4 @@
+-From 9d50e2c84ee8cf009586e805b2cbf1ddf0564002 Mon Sep 17 00:00:00 2001
++From 45d4970d931c4e9a89d287d56d66c63eebce5eed Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Fri, 14 Nov 2025 15:54:59 +0100
+ Subject: [PATCH 6/6] disable free print
+@@ -8,7 +8,7 @@ Subject: [PATCH 6/6] disable free print
+  1 file changed, 4 insertions(+), 3 deletions(-)
+ 
+ diff --git a/mt7915/mac.c b/mt7915/mac.c
+-index 3fe65137..9b3032aa 100644
++index 6e7a0627..5471ed17 100644
+ --- a/mt7915/mac.c
+ +++ b/mt7915/mac.c
+ @@ -888,9 +888,10 @@ mt7915_print_free_event(struct mt7915_dev *dev, struct mt76_txwi_cache *txwi)
