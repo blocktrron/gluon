@@ -1,0 +1,105 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 14 Nov 2025 15:55:56 +0100
+Subject: disable free print
+
+diff --git a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+index dce96ac7192a7cfc2b0389b906402a9c0715be39..684e74d78f66160e2ea0c4102cd605cf805a698a 100644
+--- a/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
++++ b/package/kernel/mt76/patches/0001-mt7915-indicate-lost-packets-to-userspace-for-missin.patch
+@@ -1,7 +1,7 @@
+ From ff38371c0fef4f3c76a34ec995911923b1a7d736 Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Mon, 3 Nov 2025 18:47:27 +0100
+-Subject: [PATCH 1/5] mt7915: indicate lost packets to userspace for missing TX
++Subject: [PATCH 1/6] mt7915: indicate lost packets to userspace for missing TX
+  Free
+ 
+ Signed-off-by: David Bauer <mail@david-bauer.net>
+diff --git a/package/kernel/mt76/patches/0002-workaround.patch b/package/kernel/mt76/patches/0002-workaround.patch
+index 5c4591fdab7a0e62c83819ca67742bd295a97a7a..7a5425c66228830ca12bd4bc85c68ca8a9e2f1e4 100644
+--- a/package/kernel/mt76/patches/0002-workaround.patch
++++ b/package/kernel/mt76/patches/0002-workaround.patch
+@@ -1,7 +1,7 @@
+ From 7b3eaadd3c11a103578dcf5c7fdcc5b27d6588ca Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Sun, 9 Nov 2025 20:33:10 +0100
+-Subject: [PATCH 2/5] workaround
++Subject: [PATCH 2/6] workaround
+ 
+ Signed-off-by: David Bauer <mail@david-bauer.net>
+ ---
+diff --git a/package/kernel/mt76/patches/0003-no-workqueue-entry.patch b/package/kernel/mt76/patches/0003-no-workqueue-entry.patch
+index b25a5af73e2d66ba078c1fd29d3dcfe1f969116b..98394e06013d4fe9faba88f586d1d472452e8c74 100644
+--- a/package/kernel/mt76/patches/0003-no-workqueue-entry.patch
++++ b/package/kernel/mt76/patches/0003-no-workqueue-entry.patch
+@@ -1,7 +1,7 @@
+ From b5cc84727c0a254fb2201118269d1f102009f0ce Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Thu, 13 Nov 2025 12:25:45 +0100
+-Subject: [PATCH 3/5] no workqueue entry
++Subject: [PATCH 3/6] no workqueue entry
+ 
+ ---
+  mt76.h          |  3 +--
+diff --git a/package/kernel/mt76/patches/0004-debugfs-store-head-fid.patch b/package/kernel/mt76/patches/0004-debugfs-store-head-fid.patch
+index 50fc163171ea5047316d4fa3907e7bf813a8e879..7b30cd74a756a4b6cf9b32e03bf3cc3e6828935b 100644
+--- a/package/kernel/mt76/patches/0004-debugfs-store-head-fid.patch
++++ b/package/kernel/mt76/patches/0004-debugfs-store-head-fid.patch
+@@ -1,7 +1,7 @@
+ From de57e84392c6031e30becbeb5f6cf7cd49103437 Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Thu, 13 Nov 2025 17:10:22 +0100
+-Subject: [PATCH 4/5] debugfs: store head fid
++Subject: [PATCH 4/6] debugfs: store head fid
+ 
+ ---
+  mt7915/debugfs.c | 9 +++++++--
+diff --git a/package/kernel/mt76/patches/0005-use-polling.patch b/package/kernel/mt76/patches/0005-use-polling.patch
+index 02fededa7b6a58b0b0ba8ac56a2250d3959a5ab3..859d3adca494bd2b7897381239e326424797f7a7 100644
+--- a/package/kernel/mt76/patches/0005-use-polling.patch
++++ b/package/kernel/mt76/patches/0005-use-polling.patch
+@@ -1,7 +1,7 @@
+ From 2e4ca7f85fec2fd9ed242a598f5cc19b66c93828 Mon Sep 17 00:00:00 2001
+ From: David Bauer <mail@david-bauer.net>
+ Date: Fri, 14 Nov 2025 13:22:19 +0100
+-Subject: [PATCH 5/5] use polling
++Subject: [PATCH 5/6] use polling
+ 
+ ---
+  mt7915/mac.c    | 169 +++++++++++++++++++++++++++---------------------
+diff --git a/package/kernel/mt76/patches/0006-disable-free-print.patch b/package/kernel/mt76/patches/0006-disable-free-print.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e4934075a2ebc33d86e08d8f60e933c2c267304f
+--- /dev/null
++++ b/package/kernel/mt76/patches/0006-disable-free-print.patch
+@@ -0,0 +1,30 @@
++From 9d50e2c84ee8cf009586e805b2cbf1ddf0564002 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 14 Nov 2025 15:54:59 +0100
++Subject: [PATCH 6/6] disable free print
++
++---
++ mt7915/mac.c | 7 ++++---
++ 1 file changed, 4 insertions(+), 3 deletions(-)
++
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index 3fe65137..9b3032aa 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -888,9 +888,10 @@ mt7915_print_free_event(struct mt7915_dev *dev, struct mt76_txwi_cache *txwi)
++ 	if (!cb->wcid)
++ 		return;
++ 
++-	dev_warn(mdev->dev,
++-		 "Freeing wcid=%d pktid=%d tokens=%d\n",
++-		 cb->wcid, cb->pktid, mdev->token_count);
+++	if (0)
+++		dev_warn(mdev->dev,
+++			"Freeing wcid=%d pktid=%d tokens=%d\n",
+++			cb->wcid, cb->pktid, mdev->token_count);
++ }
++ 
++ static void
++-- 
++2.51.0
++
