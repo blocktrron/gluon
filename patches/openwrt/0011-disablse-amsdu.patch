@@ -1,0 +1,72 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 16 Nov 2025 20:58:32 +0100
+Subject: disablse amsdu
+
+diff --git a/package/kernel/mt76/patches/0001-disablse-amsdu.patch b/package/kernel/mt76/patches/0001-disablse-amsdu.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..083f7a6b624dd11ceb21bf29dc77322a827bd801
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-disablse-amsdu.patch
+@@ -0,0 +1,62 @@
++From 8242cfb854c00f209215e73cb5628b0ac160988a Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 16 Nov 2025 20:57:06 +0100
++Subject: [PATCH] disablse amsdu
++
++---
++ mt76_connac_mac.c | 2 +-
++ mt76_connac_mcu.c | 2 +-
++ mt7915/mcu.c      | 4 ++--
++ 3 files changed, 4 insertions(+), 4 deletions(-)
++
++diff --git a/mt76_connac_mac.c b/mt76_connac_mac.c
++index 0db00efe..cb1890a0 100644
++--- a/mt76_connac_mac.c
+++++ b/mt76_connac_mac.c
++@@ -505,7 +505,7 @@ void mt76_connac2_mac_write_txwi(struct mt76_dev *dev, __le32 *txwi,
++ 				    BSS_CHANGED_BEACON_ENABLED));
++ 	bool inband_disc = !!(changed & (BSS_CHANGED_UNSOL_BCAST_PROBE_RESP |
++ 					 BSS_CHANGED_FILS_DISCOVERY));
++-	bool amsdu_en = wcid->amsdu;
+++	bool amsdu_en = 0;
++ 
++ 	if (vif) {
++ 		struct mt76_vif_link *mvif = (struct mt76_vif_link *)vif->drv_priv;
++diff --git a/mt76_connac_mcu.c b/mt76_connac_mcu.c
++index fc3e6728..8d652f5c 100644
++--- a/mt76_connac_mcu.c
+++++ b/mt76_connac_mcu.c
++@@ -611,7 +611,7 @@ mt76_connac_mcu_sta_amsdu_tlv(struct sk_buff *skb, struct ieee80211_sta *sta,
++ 	tlv = mt76_connac_mcu_add_tlv(skb, STA_REC_HW_AMSDU, sizeof(*amsdu));
++ 	amsdu = (struct sta_rec_amsdu *)tlv;
++ 	amsdu->max_amsdu_num = 8;
++-	amsdu->amsdu_en = true;
+++	amsdu->amsdu_en = 0;
++ 	amsdu->max_mpdu_size = sta->deflink.agg.max_amsdu_len >=
++ 			       IEEE80211_MAX_MPDU_LEN_VHT_7991;
++ 
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index c1fdd3c4..11ae02f9 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -626,7 +626,7 @@ mt7915_mcu_bss_hw_amsdu_tlv(struct sk_buff *skb)
++ 	amsdu->cmp_bitmap_0 = cpu_to_le32(TXD_CMP_MAP1);
++ 	amsdu->cmp_bitmap_1 = cpu_to_le32(TXD_CMP_MAP2);
++ 	amsdu->trig_thres = cpu_to_le16(2);
++-	amsdu->enable = true;
+++	amsdu->enable = false;
++ }
++ 
++ static void
++@@ -1014,7 +1014,7 @@ mt7915_mcu_sta_amsdu_tlv(struct mt7915_dev *dev, struct sk_buff *skb,
++ 	tlv = mt76_connac_mcu_add_tlv(skb, STA_REC_HW_AMSDU, sizeof(*amsdu));
++ 	amsdu = (struct sta_rec_amsdu *)tlv;
++ 	amsdu->max_amsdu_num = 8;
++-	amsdu->amsdu_en = true;
+++	amsdu->amsdu_en = false;
++ 	msta->wcid.amsdu = true;
++ 
++ 	switch (sta->deflink.agg.max_amsdu_len) {
++-- 
++2.51.0
++
