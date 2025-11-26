@@ -1,0 +1,36 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 26 Nov 2025 20:08:39 +0100
+Subject: patches
+
+diff --git a/batman-adv/patches/0003-batman-adv-account-hard-if-needed_headroom.patch b/batman-adv/patches/0003-batman-adv-account-hard-if-needed_headroom.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6222ffe331898c1ff093ae17ea78af4cac978e57
+--- /dev/null
++++ b/batman-adv/patches/0003-batman-adv-account-hard-if-needed_headroom.patch
+@@ -0,0 +1,26 @@
++From f96e14cc8fc427eaa31c933d83b0760ca8711ff0 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 26 Nov 2025 18:37:40 +0100
++Subject: [PATCH 3/3] batman-adv: account hard-if needed_headroom
++
++---
++ net/batman-adv/send.c | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/net/batman-adv/send.c b/net/batman-adv/send.c
++index 20d85c681064a..a8f685058c481 100644
++--- a/net/batman-adv/send.c
+++++ b/net/batman-adv/send.c
++@@ -77,6 +77,9 @@ int batadv_send_skb_packet(struct sk_buff *skb,
++ 		goto send_skb_err;
++ 	}
++ 
+++	if (skb_cow_head(skb, ETH_HLEN + hard_iface->net_dev->needed_headroom))
+++		goto send_skb_err;
+++
++ 	/* push to the ethernet header. */
++ 	if (batadv_skb_head_push(skb, ETH_HLEN) < 0)
++ 		goto send_skb_err;
++-- 
++2.51.0
++
