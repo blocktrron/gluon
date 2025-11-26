@@ -62,6 +62,13 @@ try_config('TARGET_SQUASHFS_BLOCK_SIZE', 256)
 -- (e.g. ramips-mt76x8) by default.
 config('DROPBEAR_ED25519', true)
 
+config('KERNEL_FTRACE', true)
+config('KERNEL_FTRACE_SYSCALLS', true)
+config('KERNEL_ENABLE_DEFAULT_TRACERS', true)
+config('KERNEL_FUNCTION_TRACER', true)
+config('KERNEL_FUNCTION_GRAPH_TRACER', true)
+config('KERNEL_DYNAMIC_FTRACE', true)
+config('KERNEL_ENABLE_DEFAULT_TRACERS', true)
 config('KERNEL_PROC_STRIPPED', true)
 config('KERNEL_AIO', false)
 try_config('KERNEL_IO_URING', false)
@@ -129,4 +136,5 @@ packages {
 	'-firewall4',
 	'gluon-core',
 	'ip6tables-zz-legacy',
+	'trace-cmd'
 }
