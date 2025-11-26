@@ -1,0 +1,131 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Wed, 26 Nov 2025 18:39:51 +0100
+Subject: patches
+
+diff --git a/target/linux/generic/pending-6.6/0001-l2tp-account-for-IP-version-for-SKB-head.patch b/target/linux/generic/pending-6.6/0001-l2tp-account-for-IP-version-for-SKB-head.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..151a061de74e511c76cb686494349b6d5f758a47
+--- /dev/null
++++ b/target/linux/generic/pending-6.6/0001-l2tp-account-for-IP-version-for-SKB-head.patch
+@@ -0,0 +1,45 @@
++From 2bf21d310ccece9f08b05d2517284cebeb547d76 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 26 Nov 2025 10:43:26 +0100
++Subject: [PATCH 1/3] l2tp: account for IP version for SKB head
++
++Account for the IP version of the tunnel when accounting skb headroom on
++xmit. This avoids having to potentially copy the skb a second time down
++the stack due to allocating not enough space for IPv6 packets.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ net/l2tp/l2tp_core.c | 10 ++++++++--
++ 1 file changed, 8 insertions(+), 2 deletions(-)
++
++diff --git a/net/l2tp/l2tp_core.c b/net/l2tp/l2tp_core.c
++index 369a2f2e459cd..17fd8893b4e99 100644
++--- a/net/l2tp/l2tp_core.c
+++++ b/net/l2tp/l2tp_core.c
++@@ -1224,7 +1224,7 @@ static int l2tp_xmit_core(struct l2tp_session *session, struct sk_buff *skb, uns
++ 	struct l2tp_tunnel *tunnel = session->tunnel;
++ 	unsigned int data_len = skb->len;
++ 	struct sock *sk = tunnel->sock;
++-	int headroom, uhlen, udp_len;
+++	int headroom, iphlen, uhlen, udp_len;
++ 	int ret = NET_XMIT_SUCCESS;
++ 	struct inet_sock *inet;
++ 	struct udphdr *uh;
++@@ -1234,7 +1234,13 @@ static int l2tp_xmit_core(struct l2tp_session *session, struct sk_buff *skb, uns
++ 	 * make room. Adjust truesize.
++ 	 */
++ 	uhlen = (tunnel->encap == L2TP_ENCAPTYPE_UDP) ? sizeof(*uh) : 0;
++-	headroom = NET_SKB_PAD + sizeof(struct iphdr) + uhlen + session->hdr_len;
+++#if IS_ENABLED(CONFIG_IPV6)
+++	if (l2tp_sk_is_v6(sk))
+++		iphlen = sizeof(struct ipv6hdr);
+++	else
+++#endif
+++		iphlen = sizeof(struct iphdr);
+++	headroom = NET_SKB_PAD + iphlen + uhlen + session->hdr_len;
++ 	if (skb_cow_head(skb, headroom)) {
++ 		kfree_skb(skb);
++ 		return NET_XMIT_DROP;
++-- 
++2.51.0
++
+diff --git a/target/linux/generic/pending-6.6/0002-l2tp-factor-layer-3-overhead-into-needed_headroom.patch b/target/linux/generic/pending-6.6/0002-l2tp-factor-layer-3-overhead-into-needed_headroom.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..171b977724b1b983ef7bc4863fa6f342685baceb
+--- /dev/null
++++ b/target/linux/generic/pending-6.6/0002-l2tp-factor-layer-3-overhead-into-needed_headroom.patch
+@@ -0,0 +1,39 @@
++From 1b1a309b4fa7ad76a563f9bea0b1126cc2ac89b2 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 26 Nov 2025 10:56:20 +0100
++Subject: [PATCH 2/3] l2tp: factor layer 3 overhead into needed_headroom
++
++Factor in the required IPv4 / IPv6 overhead into the needed headroom of
++the L2TP net device. This allows to better predict the required headroom
++for the tunnel and helps to avoid cloning the skb multiple times.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ net/l2tp/l2tp_eth.c | 4 +++-
++ 1 file changed, 3 insertions(+), 1 deletion(-)
++
++diff --git a/net/l2tp/l2tp_eth.c b/net/l2tp/l2tp_eth.c
++index cf0b66f4fb29b..5e805c484ae39 100644
++--- a/net/l2tp/l2tp_eth.c
+++++ b/net/l2tp/l2tp_eth.c
++@@ -190,6 +190,8 @@ static void l2tp_eth_adjust_mtu(struct l2tp_tunnel *tunnel,
++ 	u32 l3_overhead = 0;
++ 	u32 mtu;
++ 
+++	dev->needed_headroom = NET_SKB_PAD;
+++
++ 	/* if the encap is UDP, account for UDP header size */
++ 	if (tunnel->encap == L2TP_ENCAPTYPE_UDP) {
++ 		overhead += sizeof(struct udphdr);
++@@ -219,7 +221,7 @@ static void l2tp_eth_adjust_mtu(struct l2tp_tunnel *tunnel,
++ 	else
++ 		dev->mtu = mtu;
++ 
++-	dev->needed_headroom += session->hdr_len;
+++	dev->needed_headroom += session->hdr_len + l3_overhead;
++ }
++ 
++ static int l2tp_eth_create(struct net *net, struct l2tp_tunnel *tunnel,
++-- 
++2.51.0
++
+diff --git a/target/linux/generic/pending-6.6/0003-batman-adv-account-hard-if-needed_headroom.patch b/target/linux/generic/pending-6.6/0003-batman-adv-account-hard-if-needed_headroom.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..51873e379374c57642c37cccfc6cef168d56d6eb
+--- /dev/null
++++ b/target/linux/generic/pending-6.6/0003-batman-adv-account-hard-if-needed_headroom.patch
+@@ -0,0 +1,25 @@
++From 1b3efa6d0ece6394ed51710fc1d8ced59fd0e796 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 26 Nov 2025 18:37:40 +0100
++Subject: [PATCH 3/3] batman-adv: account hard-if needed_headroom
++
++---
++ net/batman-adv/send.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/net/batman-adv/send.c b/net/batman-adv/send.c
++index 20d85c681064a..d15e6b49999b7 100644
++--- a/net/batman-adv/send.c
+++++ b/net/batman-adv/send.c
++@@ -78,7 +78,7 @@ int batadv_send_skb_packet(struct sk_buff *skb,
++ 	}
++ 
++ 	/* push to the ethernet header. */
++-	if (batadv_skb_head_push(skb, ETH_HLEN) < 0)
+++	if (batadv_skb_head_push(skb, ETH_HLEN + hard_iface->net_dev->needed_headroom) < 0)
++ 		goto send_skb_err;
++ 
++ 	skb_reset_mac_header(skb);
++-- 
++2.51.0
++
