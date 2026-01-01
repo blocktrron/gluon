@@ -1,0 +1,469 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Thu, 1 Jan 2026 17:09:09 +0100
+Subject: import mt76 patches
+
+diff --git a/package/kernel/mt76/patches/0001-wifi-mt76-mt7915-add-debug-query-from-WA-CPU.patch b/package/kernel/mt76/patches/0001-wifi-mt76-mt7915-add-debug-query-from-WA-CPU.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..195edc631050113f090acb0dd97ceeebbb388158
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-wifi-mt76-mt7915-add-debug-query-from-WA-CPU.patch
+@@ -0,0 +1,118 @@
++From b4190e8358f624479aaecaeddd4e5060547d775c Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 21 Dec 2025 14:58:14 +0100
++Subject: [PATCH 1/6] wifi: mt76: mt7915: add debug query from WA CPU
++
++Add a new file to the mt76 debugfs to allow querying internal state
++information from the WA (offloading) CPU.
++
++This allows to extract more information from the internal queue
++strcutures.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/debugfs.c | 81 ++++++++++++++++++++++++++++++++++++++++++++++++
++ 1 file changed, 81 insertions(+)
++
++diff --git a/mt7915/debugfs.c b/mt7915/debugfs.c
++index e80d1548..00050b90 100644
++--- a/mt7915/debugfs.c
+++++ b/mt7915/debugfs.c
++@@ -603,6 +603,86 @@ mt7915_fw_debug_wa_get(void *data, u64 *val)
++ DEFINE_DEBUGFS_ATTRIBUTE(fops_fw_debug_wa, mt7915_fw_debug_wa_get,
++ 			 mt7915_fw_debug_wa_set, "%lld\n");
++ 
+++struct {
+++	u8 idx;
+++	u8 query_cmd;
+++	char *description;
+++} mt7915_fw_wa_debug_query[] = {
+++	{ 0, 0x16, "MSDU drop info" },
+++	{ 1, 0x17, "AC queue tail drop" },
+++	{ 2, 0x19, "TX Free info" },
+++	{ 3, 0x20, "BSS Table" },
+++	{ 4, 0x21, "STA records" },
+++};
+++
+++static ssize_t
+++mt7915_fw_debug_wa_query_set(struct file *file, const char __user *user_buf,
+++			     size_t count, loff_t *ppos)
+++{
+++	struct mt7915_phy *phy = file->private_data;
+++	struct mt7915_dev *dev = phy->dev;
+++	char buf[16];
+++	u16 val;
+++
+++	if (count >= sizeof(buf))
+++		return -EINVAL;
+++
+++	if (copy_from_user(buf, user_buf, count))
+++		return -EFAULT;
+++
+++	if (count && buf[count - 1] == '\n')
+++		buf[count - 1] = '\0';
+++	else
+++		buf[count] = '\0';
+++
+++	if (kstrtou16(buf, 0, &val))
+++		return -EINVAL;
+++
+++	for (int i = 0; i < ARRAY_SIZE(mt7915_fw_wa_debug_query); i++) {
+++		if (val != mt7915_fw_wa_debug_query[i].idx)
+++			continue;
+++
+++		mt7915_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(QUERY), 
+++					 mt7915_fw_wa_debug_query[i].query_cmd,
+++					 0, 0);
+++		return count;
+++	}
+++
+++	return count;
+++}
+++
+++static ssize_t
+++mt7915_fw_debug_wa_query_get(struct file *file, char __user *user_buf,
+++			     size_t count, loff_t *ppos)
+++{
+++	char *buff;
+++	int desc = 0;
+++	ssize_t ret;
+++	static const size_t bufsz = 1024;
+++
+++	buff = kmalloc(bufsz, GFP_KERNEL);
+++	if (!buff)
+++		return -ENOMEM;
+++
+++	/* HELP */
+++	for (int i = 0; i < ARRAY_SIZE(mt7915_fw_wa_debug_query); i++) {
+++		desc += scnprintf(buff + desc, bufsz - desc,
+++				  "%d: %s\n", mt7915_fw_wa_debug_query[i].idx,
+++				  mt7915_fw_wa_debug_query[i].description);
+++	}
+++
+++	ret = simple_read_from_buffer(user_buf, count, ppos, buff, desc);
+++	kfree(buff);
+++	return ret;
+++}
+++
+++static const struct file_operations mt7915_fw_debug_wa_query_ops = {
+++	.write = mt7915_fw_debug_wa_query_set,
+++	.read = mt7915_fw_debug_wa_query_get,
+++	.open = simple_open,
+++	.llseek = default_llseek,
+++};
+++
++ static struct dentry *
++ create_buf_file_cb(const char *filename, struct dentry *parent, umode_t mode,
++ 		   struct rchan_buf *buf, int *is_global)
++@@ -1310,6 +1390,7 @@ int mt7915_init_debugfs(struct mt7915_phy *phy)
++ 			    &mt7915_sys_recovery_ops);
++ 	debugfs_create_file("fw_debug_wm", 0600, dir, dev, &fops_fw_debug_wm);
++ 	debugfs_create_file("fw_debug_wa", 0600, dir, dev, &fops_fw_debug_wa);
+++	debugfs_create_file("fw_debug_wa_query", 0600, dir, dev, &mt7915_fw_debug_wa_query_ops);
++ 	debugfs_create_file("fw_debug_bin", 0600, dir, dev, &fops_fw_debug_bin);
++ 	debugfs_create_file("fw_util_wm", 0400, dir, dev,
++ 			    &mt7915_fw_util_wm_fops);
++-- 
++2.51.0
++
+diff --git a/package/kernel/mt76/patches/0002-wifi-mt76-mt7915-track-STA-PS-state.patch b/package/kernel/mt76/patches/0002-wifi-mt76-mt7915-track-STA-PS-state.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..f6e5c85ff46dd9871ee23784fc45d60f4864542d
+--- /dev/null
++++ b/package/kernel/mt76/patches/0002-wifi-mt76-mt7915-track-STA-PS-state.patch
+@@ -0,0 +1,68 @@
++From 42e6fe46da9daf48e69fc3e7cdaea01cb9ca9f09 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 22 Dec 2025 00:44:57 +0100
++Subject: [PATCH 2/6] wifi: mt76: mt7915: track STA PS state
++
++---
++ mac80211.c    | 8 +++++---
++ mt76.h        | 1 +
++ mt7915/main.c | 5 +++++
++ 3 files changed, 11 insertions(+), 3 deletions(-)
++
++diff --git a/mac80211.c b/mac80211.c
++index 8bb7403f..c5e75dc3 100644
++--- a/mac80211.c
+++++ b/mac80211.c
++@@ -1465,7 +1465,8 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
++ 	if (!test_bit(MT_WCID_FLAG_CHECK_PS, &wcid->flags))
++ 		return;
++ 
++-	if (ieee80211_is_pspoll(hdr->frame_control)) {
+++	if (ieee80211_is_pspoll(hdr->frame_control) &&
+++	    !test_bit(MT_WCID_FLAG_CHECK_PS, &wcid->flags)) {
++ 		ieee80211_sta_pspoll(sta);
++ 		return;
++ 	}
++@@ -1477,8 +1478,9 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
++ 
++ 	ps = ieee80211_has_pm(hdr->frame_control);
++ 
++-	if (ps && (ieee80211_is_data_qos(hdr->frame_control) ||
++-		   ieee80211_is_qos_nullfunc(hdr->frame_control)))
+++	if (ps && !test_bit(MT_WCID_FLAG_CHECK_PS, &wcid->flags) && 
+++	    (ieee80211_is_data_qos(hdr->frame_control) ||
+++	     ieee80211_is_qos_nullfunc(hdr->frame_control)))
++ 		ieee80211_sta_uapsd_trigger(sta, tidno);
++ 
++ 	if (!!test_bit(MT_WCID_FLAG_PS, &wcid->flags) == ps)
++diff --git a/mt76.h b/mt76.h
++index 646cc8e5..2919ef7d 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -368,6 +368,7 @@ struct mt76_sta_stats {
++ 
++ enum mt76_wcid_flags {
++ 	MT_WCID_FLAG_CHECK_PS,
+++	MT_WCID_FLAG_TOGGLE_Q_PS,
++ 	MT_WCID_FLAG_PS,
++ 	MT_WCID_FLAG_4ADDR,
++ 	MT_WCID_FLAG_HDR_TRANS,
++diff --git a/mt7915/main.c b/mt7915/main.c
++index 7a6ebb23..9a4138fb 100644
++--- a/mt7915/main.c
+++++ b/mt7915/main.c
++@@ -772,6 +772,11 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
++ 			       MT_WTBL_UPDATE_ADM_COUNT_CLEAR);
++ 	mt7915_mcu_add_sta(dev, vif, sta, CONN_STATE_DISCONNECT, true);
++ 
+++	if (vif->type == NL80211_IFTYPE_AP) {
+++		set_bit(MT_WCID_FLAG_CHECK_PS, &msta->wcid.flags);
+++		set_bit(MT_WCID_FLAG_TOGGLE_Q_PS, &msta->wcid.flags);
+++	}
+++
++ 	return 0;
++ }
++ 
++-- 
++2.51.0
++
+diff --git a/package/kernel/mt76/patches/0003-wifi-mt76-mt7915-track-entry-times.patch b/package/kernel/mt76/patches/0003-wifi-mt76-mt7915-track-entry-times.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..33587fae8e6cd253e8feb63fa368d5274d3f36fe
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-wifi-mt76-mt7915-track-entry-times.patch
+@@ -0,0 +1,60 @@
++From 5bac5f02f9ab5874b2a984a2ebe46f5ab1dec62d Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 24 Dec 2025 23:13:30 +0100
++Subject: [PATCH 3/6] wifi: mt76: mt7915: track entry times
++
++---
++ mt7915/mmio.c   | 13 +++++++++++++
++ mt7915/mt7915.h |  5 +++++
++ 2 files changed, 18 insertions(+)
++
++diff --git a/mt7915/mmio.c b/mt7915/mmio.c
++index 2708b155..5cd3c96b 100644
++--- a/mt7915/mmio.c
+++++ b/mt7915/mmio.c
++@@ -914,6 +914,18 @@ irqreturn_t mt7915_irq_handler(int irq, void *dev_instance)
++ 	return IRQ_HANDLED;
++ }
++ 
+++static void
+++mt7915_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
+++{
+++	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+++
+++	if (ps) {
+++		msta->psm.active_since = jiffies;
+++	} else {
+++		msta->psm.active_since = 0;
+++	}
+++}
+++
++ struct mt7915_dev *mt7915_mmio_probe(struct device *pdev,
++ 				     void __iomem *mem_base, u32 device_id)
++ {
++@@ -934,6 +946,7 @@ struct mt7915_dev *mt7915_mmio_probe(struct device *pdev,
++ 		.sta_add = mt7915_mac_sta_add,
++ 		.sta_event = mt7915_mac_sta_event,
++ 		.sta_remove = mt7915_mac_sta_remove,
+++		.sta_ps = mt7915_sta_ps,
++ 		.update_survey = mt7915_update_channel,
++ 		.set_channel = mt7915_set_channel,
++ 	};
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index 7d98a42d..80317d58 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -147,6 +147,11 @@ struct mt7915_sta {
++ 	unsigned long jiffies;
++ 	struct mt76_connac_sta_key_conf bip;
++ 
+++	struct {
+++		u64 active_since;
+++		u8 psm_set;
+++	} psm;
+++
++ 	struct {
++ 		u8 flowid_mask;
++ 		struct mt7915_twt_flow flow[MT7915_MAX_STA_TWT_AGRT];
++-- 
++2.51.0
++
+diff --git a/package/kernel/mt76/patches/0004-wifi-mt76-mt7915-always-enable-RED.patch b/package/kernel/mt76/patches/0004-wifi-mt76-mt7915-always-enable-RED.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee12e2ae5e977c83d18845a16880c68ab1422e99
+--- /dev/null
++++ b/package/kernel/mt76/patches/0004-wifi-mt76-mt7915-always-enable-RED.patch
+@@ -0,0 +1,25 @@
++From 7c627885eca5f756757ec16a64ef0ba346300b66 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 24 Dec 2025 23:14:39 +0100
++Subject: [PATCH 4/6] wifi: mt76: mt7915: always enable RED
++
++---
++ mt7915/mcu.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 40364eea..7750d469 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -2446,7 +2446,7 @@ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
++ 	if (ret)
++ 		return ret;
++ 
++-	return mt7915_mcu_set_red(dev, mtk_wed_device_active(&dev->mt76.mmio.wed));
+++	return mt7915_mcu_set_red(dev, 1);
++ }
++ 
++ int mt7915_mcu_init(struct mt7915_dev *dev)
++-- 
++2.51.0
++
+diff --git a/package/kernel/mt76/patches/0005-wifi-mt76-mt7915-configure-packet-limits.patch b/package/kernel/mt76/patches/0005-wifi-mt76-mt7915-configure-packet-limits.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..38dfb8e05051be818e65e612fa9717ee77eef3b7
+--- /dev/null
++++ b/package/kernel/mt76/patches/0005-wifi-mt76-mt7915-configure-packet-limits.patch
+@@ -0,0 +1,87 @@
++From d9b71c46c82521e23480575948363133baa1c69e Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 24 Dec 2025 23:22:36 +0100
++Subject: [PATCH 5/6] wifi: mt76: mt7915: configure packet limits
++
++---
++ mt76_connac_mcu.h |  1 +
++ mt7915/mcu.c      | 31 ++++++++++++++++++++++++++++++-
++ mt7915/mt7915.h   |  1 +
++ 3 files changed, 32 insertions(+), 1 deletion(-)
++
++diff --git a/mt76_connac_mcu.h b/mt76_connac_mcu.h
++index 8d59cf43..7f773796 100644
++--- a/mt76_connac_mcu.h
+++++ b/mt76_connac_mcu.h
++@@ -1247,6 +1247,7 @@ enum {
++ 	MCU_EXT_CMD_TXDPD_CAL = 0x60,
++ 	MCU_EXT_CMD_CAL_CACHE = 0x67,
++ 	MCU_EXT_CMD_RED_ENABLE = 0x68,
+++	MCU_EXT_CMD_SET_PKT_LIMIT = 0x6c,
++ 	MCU_EXT_CMD_CP_SUPPORT = 0x75,
++ 	MCU_EXT_CMD_SET_RADAR_TH = 0x7c,
++ 	MCU_EXT_CMD_SET_RDD_PATTERN = 0x7d,
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 7750d469..15a11ccd 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -2361,6 +2361,31 @@ static int mt7915_red_set_watermark(struct mt7915_dev *dev)
++ 				 sizeof(req), false);
++ }
++ 
+++int mt7915_mcu_set_packet_limit(struct mt7915_dev *dev, u8 bss_idx, u16 wcid_idx, u32 limit)
+++{
+++	#define MT7915_PKT_LIMIT_NUM_QUEUES  (2 * 5)
+++	#define MT7915_PKT_LIMITS (MT7915_PKT_LIMIT_NUM_QUEUES * 2)
+++
+++	struct {
+++		u8 bss_idx;
+++		u8 num_queues;
+++		__le16 wcid_idx;
+++		uint8_t rsv[4];
+++		__le16 limits[MT7915_PKT_LIMITS];
+++	} __packed req = {
+++		.bss_idx = bss_idx,
+++		.num_queues = MT7915_PKT_LIMIT_NUM_QUEUES,
+++		.wcid_idx = cpu_to_le16(wcid_idx),
+++	};
+++
+++	for (u8 i = 0; i < MT7915_PKT_LIMITS; i++)
+++		req.limits[i] = cpu_to_le16(limit);
+++
+++	return mt76_mcu_send_msg(&dev->mt76, MCU_WA_EXT_CMD(SET_PKT_LIMIT), &req,
+++				 sizeof(req), true);
+++}
+++
+++
++ static int mt7915_mcu_set_red(struct mt7915_dev *dev, bool enabled)
++ {
++ #define RED_DISABLE		0
++@@ -2446,7 +2471,11 @@ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
++ 	if (ret)
++ 		return ret;
++ 
++-	return mt7915_mcu_set_red(dev, 1);
+++	ret = mt7915_mcu_set_red(dev, 1);
+++	if (ret)
+++		return ret;
+++	
+++	return mt7915_mcu_set_packet_limit(dev, 0xFF, 0xFFFF, 512);
++ }
++ 
++ int mt7915_mcu_init(struct mt7915_dev *dev)
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index 80317d58..21847286 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -531,6 +531,7 @@ int mt7915_mcu_get_chan_mib_info(struct mt7915_phy *phy, bool chan_switch);
++ int mt7915_mcu_get_temperature(struct mt7915_phy *phy);
++ int mt7915_mcu_set_thermal_throttling(struct mt7915_phy *phy, u8 state);
++ int mt7915_mcu_set_thermal_protect(struct mt7915_phy *phy);
+++int mt7915_mcu_set_packet_limit(struct mt7915_dev *dev, u8 bss_idx, u16 wcid_idx, u32 limit);
++ int mt7915_mcu_get_rx_rate(struct mt7915_phy *phy, struct ieee80211_vif *vif,
++ 			   struct ieee80211_sta *sta, struct rate_info *rate);
++ int mt7915_mcu_rdd_background_enable(struct mt7915_phy *phy,
++-- 
++2.51.0
++
+diff --git a/package/kernel/mt76/patches/0006-wifi-mt76-mt7915-configure-per-sta.patch b/package/kernel/mt76/patches/0006-wifi-mt76-mt7915-configure-per-sta.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ae9390abdec31fb656a6e731218f4df4b3702a5
+--- /dev/null
++++ b/package/kernel/mt76/patches/0006-wifi-mt76-mt7915-configure-per-sta.patch
+@@ -0,0 +1,71 @@
++From 084c39a92364c53a4392a00d0c11fed81124f3e0 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Thu, 25 Dec 2025 17:42:51 +0100
++Subject: [PATCH 6/6] wifi: mt76: mt7915: configure per-sta
++
++---
++ mt7915/mac.c    | 26 ++++++++++++++++++++++++++
++ mt7915/mt7915.h |  3 ++-
++ 2 files changed, 28 insertions(+), 1 deletion(-)
++
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index c409ecb6..8df6b327 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -1996,6 +1996,30 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ }
++ 
+++static void mt7915_mac_sta_psm_check(void *data, struct ieee80211_sta *sta)
+++{
+++	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+++	struct mt7915_phy *phy = data;
+++	struct mt7915_dev *dev = phy->dev;
+++
+++	if (msta->psm.initial_set && !!msta->psm.psm_set == !!msta->psm.active_since)
+++		return;
+++	
+++	if (msta->psm.initial_set &&
+++	    time_is_after_jiffies(msta->psm.active_since + (1000 * HZ)))
+++		return;
+++	
+++	mt7915_mcu_set_packet_limit(dev, msta->wcid.idx, msta->vif->mt76.idx, msta->psm.active_since ? 1 : 64);
+++	msta->psm.initial_set = true;
+++	msta->psm.psm_set = !!msta->psm.active_since;
+++}
+++
+++static void mt7915_psm_work(struct mt7915_phy *phy)
+++{
+++	ieee80211_iterate_stations_atomic(phy->mt76->hw,
+++					  mt7915_mac_sta_psm_check, phy);
+++}
+++
++ void mt7915_mac_work(struct work_struct *work)
++ {
++ 	struct mt7915_phy *phy;
++@@ -2014,6 +2038,8 @@ void mt7915_mac_work(struct work_struct *work)
++ 		mt7915_mac_update_stats(phy);
++ 		mt7915_mac_severe_check(phy);
++ 
+++		mt7915_psm_work(phy);
+++
++ 		if (phy->dev->muru_debug)
++ 			mt7915_mcu_muru_debug_get(phy);
++ 	}
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index 21847286..e98a578c 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -148,7 +148,8 @@ struct mt7915_sta {
++ 	struct mt76_connac_sta_key_conf bip;
++ 
++ 	struct {
++-		u64 active_since;
+++		unsigned long active_since;
+++		u8 initial_set;
++ 		u8 psm_set;
++ 	} psm;
++ 
++-- 
++2.51.0
++
