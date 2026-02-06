@@ -1,0 +1,264 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 6 Feb 2026 08:55:24 +0100
+Subject: wifi: mac80211: ps airtime buffering
+
+diff --git a/package/kernel/mac80211/patches/subsys/800-wifi-mac80211-add-flag-for-driver-buffering-of-PS.patch b/package/kernel/mac80211/patches/subsys/800-wifi-mac80211-add-flag-for-driver-buffering-of-PS.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4f38afb2807dfab35149b44065f1f663a8f2cbe3
+--- /dev/null
++++ b/package/kernel/mac80211/patches/subsys/800-wifi-mac80211-add-flag-for-driver-buffering-of-PS.patch
+@@ -0,0 +1,48 @@
++From 273231019417e3d98804cdacfd4f539e1208f99b Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Wed, 4 Feb 2026 21:57:52 +0100
++Subject: [PATCH] wifi: mac80211: add flag for driver-buffering of PS
++
++---
++ include/net/mac80211.h | 5 +++++
++ net/mac80211/debugfs.c | 1 +
++ 2 files changed, 6 insertions(+)
++
++diff --git a/include/net/mac80211.h b/include/net/mac80211.h
++index 36ae7fe9ddf35..1030ba6c2fab9 100644
++--- a/include/net/mac80211.h
+++++ b/include/net/mac80211.h
++@@ -2871,6 +2871,10 @@ struct ieee80211_txq {
++  *	HW flag so drivers can opt in according to their own control, e.g. in
++  *	testing.
++  *
+++ * @IEEE80211_HW_STORES_PS_FRAMES: Hardware/driver stores frames for
+++ *	power-saving stations instead of returning them to mac80211 for
+++ *	buffering.
+++ *
++  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
++  */
++ enum ieee80211_hw_flags {
++@@ -2931,6 +2935,7 @@ enum ieee80211_hw_flags {
++ 	IEEE80211_HW_DISALLOW_PUNCTURING,
++ 	IEEE80211_HW_HANDLES_QUIET_CSA,
++ 	IEEE80211_HW_STRICT,
+++	IEEE80211_HW_STORES_PS_FRAMES,
++ 
++ 	/* keep last, obviously */
++ 	NUM_IEEE80211_HW_FLAGS
++diff --git a/net/mac80211/debugfs.c b/net/mac80211/debugfs.c
++index d02f07368c511..eb27eb2a8191f 100644
++--- a/net/mac80211/debugfs.c
+++++ b/net/mac80211/debugfs.c
++@@ -490,6 +490,7 @@ static const char *hw_flag_names[] = {
++ 	FLAG(DISALLOW_PUNCTURING),
++ 	FLAG(HANDLES_QUIET_CSA),
++ 	FLAG(STRICT),
+++	FLAG(STORES_PS_FRAMES),
++ #undef FLAG
++ };
++ 
++-- 
++2.51.0
++
+diff --git a/package/kernel/mac80211/patches/subsys/801-wifi-mac80211-introduce-framework-for-exempt-PS-stat.patch b/package/kernel/mac80211/patches/subsys/801-wifi-mac80211-introduce-framework-for-exempt-PS-stat.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..59a1119127674d40f4214c673922f0e14798f14b
+--- /dev/null
++++ b/package/kernel/mac80211/patches/subsys/801-wifi-mac80211-introduce-framework-for-exempt-PS-stat.patch
+@@ -0,0 +1,200 @@
++From 7b0e3ca38f2215ca41d6115f3535cefcb78c7ddb Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 30 Jan 2026 17:02:04 +0100
++Subject: [PATCH 2/2] wifi: mac80211: introduce framework for exempt PS
++ stations from airtime accounting
++
++---
++ net/mac80211/ieee80211_i.h |  2 +
++ net/mac80211/main.c        |  1 +
++ net/mac80211/rx.c          |  4 ++
++ net/mac80211/sta_info.c    | 75 +++++++++++++++++++++++++++++++-------
++ net/mac80211/sta_info.h    |  3 ++
++ 5 files changed, 72 insertions(+), 13 deletions(-)
++
++--- a/net/mac80211/ieee80211_i.h
+++++ b/net/mac80211/ieee80211_i.h
++@@ -1385,6 +1385,8 @@ struct ieee80211_local {
++ 
++ 	const struct ieee80211_ops *ops;
++ 
+++	spinlock_t airtime_lock;
+++
++ 	/*
++ 	 * private workqueue to mac80211. mac80211 makes this accessible
++ 	 * via ieee80211_queue_work()
++--- a/net/mac80211/main.c
+++++ b/net/mac80211/main.c
++@@ -950,6 +950,7 @@ struct ieee80211_hw *ieee80211_alloc_hw_
++ 	__hw_addr_init(&local->mc_list);
++ 
++ 	mutex_init(&local->iflist_mtx);
+++	spin_lock_init(&local->airtime_lock);
++ 	spin_lock_init(&local->filter_lock);
++ 	spin_lock_init(&local->rx_path_lock);
++ 	spin_lock_init(&local->queue_stop_reason_lock);
++--- a/net/mac80211/rx.c
+++++ b/net/mac80211/rx.c
++@@ -1586,6 +1586,8 @@ static void sta_ps_start(struct sta_info
++ 	ps_dbg(sdata, "STA %pM aid %d enters power save mode\n",
++ 	       sta->sta.addr, sta->sta.aid);
++ 
+++	ieee80211_sta_pending_airtime_ps(sta, true);
+++
++ 	ieee80211_clear_fast_xmit(sta);
++ 
++ 	for (tid = 0; tid < IEEE80211_NUM_TIDS; tid++) {
++@@ -1609,6 +1611,8 @@ static void sta_ps_end(struct sta_info *
++ 	ps_dbg(sta->sdata, "STA %pM aid %d exits power save mode\n",
++ 	       sta->sta.addr, sta->sta.aid);
++ 
+++	ieee80211_sta_pending_airtime_ps(sta, false);
+++
++ 	if (test_sta_flag(sta, WLAN_STA_PS_DRIVER)) {
++ 		/*
++ 		 * Clear the flag only if the other one is still set
++--- a/net/mac80211/sta_info.c
+++++ b/net/mac80211/sta_info.c
++@@ -1443,6 +1443,8 @@ static void __sta_info_destroy_part2(str
++ 	might_sleep();
++ 	lockdep_assert_wiphy(local->hw.wiphy);
++ 
+++	ieee80211_sta_pending_airtime_ps(sta, false);
+++
++ 	if (sta->sta_state == IEEE80211_STA_AUTHORIZED) {
++ 		ret = _sta_info_move_state(sta, IEEE80211_STA_ASSOC, recalc);
++ 		WARN_ON_ONCE(ret);
++@@ -2358,16 +2360,57 @@ void ieee80211_sta_recalc_aggregates(str
++ }
++ EXPORT_SYMBOL(ieee80211_sta_recalc_aggregates);
++ 
+++void ieee80211_sta_pending_airtime_ps(struct sta_info *sta, bool ps_state)
+++{
+++	unsigned long flags;
+++	int tx_pending;
+++	int ac;
+++
+++	if (!wiphy_ext_feature_isset(sta->local->hw.wiphy,
+++				    NL80211_EXT_FEATURE_AQL))
+++		return;
+++
+++	if (sta->airtime_ps == ps_state)
+++		return;
+++
+++	if (!ieee80211_hw_check(&sta->local->hw, STORES_PS_FRAMES))
+++		return;
+++
+++	spin_lock_irqsave(&sta->local->airtime_lock, flags);
+++	for (ac = 0; ac < IEEE80211_NUM_ACS; ac++) {
+++		tx_pending = atomic_read(&sta->airtime[ac].aql_tx_pending);
+++
+++		if (!ps_state) {
+++			atomic_add(tx_pending, &sta->local->aql_total_pending_airtime);
+++			atomic_add(tx_pending, &sta->local->aql_ac_pending_airtime[ac]);
+++		} else {
+++			atomic_sub(tx_pending, &sta->local->aql_total_pending_airtime);
+++			atomic_sub(tx_pending, &sta->local->aql_ac_pending_airtime[ac]);
+++		}
+++	}
+++	spin_unlock_irqrestore(&sta->local->airtime_lock, flags);
+++
+++	sta->airtime_ps = ps_state;
+++}
+++
+++
++ void ieee80211_sta_update_pending_airtime(struct ieee80211_local *local,
++ 					  struct sta_info *sta, u8 ac,
++ 					  u16 tx_airtime, bool tx_completed,
++ 					  bool mcast)
++ {
+++	unsigned long flags;
++ 	int tx_pending;
+++	bool lock;
+++
+++	lock = sta && ieee80211_hw_check(&local->hw, STORES_PS_FRAMES);
++ 
++ 	if (!wiphy_ext_feature_isset(local->hw.wiphy, NL80211_EXT_FEATURE_AQL))
++ 		return;
++ 
+++	if (lock)
+++		spin_lock_irqsave(&sta->local->airtime_lock, flags);
+++
++ 	if (mcast) {
++ 		if (!tx_completed) {
++ 			atomic_add(tx_airtime, &local->aql_bc_pending_airtime);
++@@ -2379,7 +2422,7 @@ void ieee80211_sta_update_pending_airtim
++ 		if (tx_pending < 0)
++ 			atomic_cmpxchg(&local->aql_bc_pending_airtime,
++ 				       tx_pending, 0);
++-		return;
+++		goto out;
++ 	}
++ 
++ 	if (!tx_completed) {
++@@ -2387,9 +2430,11 @@ void ieee80211_sta_update_pending_airtim
++ 			atomic_add(tx_airtime,
++ 				   &sta->airtime[ac].aql_tx_pending);
++ 
++-		atomic_add(tx_airtime, &local->aql_total_pending_airtime);
++-		atomic_add(tx_airtime, &local->aql_ac_pending_airtime[ac]);
++-		return;
+++		if (!sta || !sta->airtime_ps) {
+++			atomic_add(tx_airtime, &local->aql_total_pending_airtime);
+++			atomic_add(tx_airtime, &local->aql_ac_pending_airtime[ac]);
+++		}
+++		goto out;
++ 	}
++ 
++ 	if (sta) {
++@@ -2400,17 +2445,22 @@ void ieee80211_sta_update_pending_airtim
++ 				       tx_pending, 0);
++ 	}
++ 
++-	atomic_sub(tx_airtime, &local->aql_total_pending_airtime);
++-	tx_pending = atomic_sub_return(tx_airtime,
++-				       &local->aql_ac_pending_airtime[ac]);
++-	if (WARN_ONCE(tx_pending < 0,
++-		      "Device %s AC %d pending airtime underflow: %u, %u",
++-		      wiphy_name(local->hw.wiphy), ac, tx_pending,
++-		      tx_airtime)) {
++-		atomic_cmpxchg(&local->aql_ac_pending_airtime[ac],
++-			       tx_pending, 0);
++-		atomic_sub(tx_pending, &local->aql_total_pending_airtime);
+++	if (!sta || !sta->airtime_ps) {
+++		atomic_sub(tx_airtime, &local->aql_total_pending_airtime);
+++		tx_pending = atomic_sub_return(tx_airtime,
+++					       &local->aql_ac_pending_airtime[ac]);
+++		if (WARN_ONCE(tx_pending < 0,
+++			      "Device %s AC %d pending airtime underflow: %u, %u",
+++			      wiphy_name(local->hw.wiphy), ac, tx_pending,
+++			      tx_airtime)) {
+++			atomic_cmpxchg(&local->aql_ac_pending_airtime[ac],
+++				       tx_pending, 0);
+++			atomic_sub(tx_pending, &local->aql_total_pending_airtime);
+++		}
++ 	}
+++out:
+++	if (lock)
+++		spin_unlock_irqrestore(&sta->local->airtime_lock, flags);
++ }
++ 
++ static struct ieee80211_sta_rx_stats *
++--- a/net/mac80211/sta_info.h
+++++ b/net/mac80211/sta_info.h
++@@ -150,6 +150,8 @@ void ieee80211_sta_update_pending_airtim
++ 					  u16 tx_airtime, bool tx_completed,
++ 					  bool mcast);
++ 
+++void ieee80211_sta_pending_airtime_ps(struct sta_info *sta, bool ps_state);
+++
++ struct sta_info;
++ 
++ /**
++@@ -692,6 +694,7 @@ struct sta_info {
++ 
++ 	struct airtime_info airtime[IEEE80211_NUM_ACS];
++ 	u16 airtime_weight;
+++	u8 airtime_ps;
++ 
++ 	/*
++ 	 * Aggregation information, locked with lock.
