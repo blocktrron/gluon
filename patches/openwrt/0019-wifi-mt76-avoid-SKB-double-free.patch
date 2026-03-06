@@ -1,0 +1,176 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 6 Mar 2026 10:56:23 +0100
+Subject: wifi: mt76: avoid SKB double-free
+
+diff --git a/package/kernel/mt76/patches/950-wifi-mt76-avoid-double-free-of-SKB.patch b/package/kernel/mt76/patches/950-wifi-mt76-avoid-double-free-of-SKB.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a2f86b77852df213e1296efba1d8c26f4b2366e1
+--- /dev/null
++++ b/package/kernel/mt76/patches/950-wifi-mt76-avoid-double-free-of-SKB.patch
+@@ -0,0 +1,166 @@
++From 7e6ccd66bfa76f722b75a6211e67b88949bf1f13 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Thu, 5 Mar 2026 23:10:52 +0100
++Subject: [PATCH] wifi: mt76: avoid double-free of SKB
++
++---
++ mac80211.c     | 16 +++++++++-------
++ mt76.h         |  2 +-
++ mt7603/main.c  |  2 +-
++ mt7615/main.c  |  2 +-
++ mt76x02_util.c |  2 +-
++ mt7915/main.c  |  2 +-
++ mt7925/main.c  |  2 +-
++ mt792x_core.c  |  2 +-
++ mt7996/main.c  |  4 ++--
++ 9 files changed, 18 insertions(+), 16 deletions(-)
++
++--- a/mac80211.c
+++++ b/mac80211.c
++@@ -796,7 +796,7 @@ void mt76_unregister_device(struct mt76_
++ 	if (IS_ENABLED(CONFIG_MT76_LEDS))
++ 		mt76_led_cleanup(&dev->phy);
++ 	mt76_tx_status_check(dev, true);
++-	mt76_wcid_cleanup(dev, &dev->global_wcid);
+++	mt76_wcid_cleanup(dev, &dev->global_wcid, true);
++ 	ieee80211_unregister_hw(hw);
++ }
++ EXPORT_SYMBOL_GPL(mt76_unregister_device);
++@@ -837,7 +837,7 @@ void mt76_reset_device(struct mt76_dev *
++ 			continue;
++ 
++ 		wcid->sta = 0;
++-		mt76_wcid_cleanup(dev, wcid);
+++		mt76_wcid_cleanup(dev, wcid, true);
++ 		rcu_assign_pointer(dev->wcid[i], NULL);
++ 	}
++ 	rcu_read_unlock();
++@@ -1608,7 +1608,7 @@ void __mt76_sta_remove(struct mt76_phy *
++ 	if (dev->drv->sta_remove)
++ 		dev->drv->sta_remove(dev, vif, sta);
++ 
++-	mt76_wcid_cleanup(dev, wcid);
+++	mt76_wcid_cleanup(dev, wcid, !(dev->drv->drv_flags & MT_DRV_TXWI_NO_FREE));
++ 
++ 	mt76_wcid_mask_clear(dev->wcid_mask, idx);
++ 	phy->num_sta--;
++@@ -1697,16 +1697,18 @@ void mt76_wcid_init(struct mt76_wcid *wc
++ }
++ EXPORT_SYMBOL_GPL(mt76_wcid_init);
++ 
++-void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid)
+++void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid, bool free_hw)
++ {
++ 	struct mt76_phy *phy = mt76_dev_phy(dev, wcid->phy_idx);
++ 	struct ieee80211_hw *hw;
++ 	struct sk_buff_head list;
++ 	struct sk_buff *skb;
++ 
++-	mt76_tx_status_lock(dev, &list);
++-	mt76_tx_status_skb_get(dev, wcid, -1, &list);
++-	mt76_tx_status_unlock(dev, &list);
+++	if (free_hw) {
+++		mt76_tx_status_lock(dev, &list);
+++		mt76_tx_status_skb_get(dev, wcid, -1, &list);
+++		mt76_tx_status_unlock(dev, &list);
+++	}
++ 
++ 	idr_destroy(&wcid->pktid);
++ 
++--- a/mt76.h
+++++ b/mt76.h
++@@ -2065,7 +2065,7 @@ mt76_token_put(struct mt76_dev *dev, int
++ }
++ 
++ void mt76_wcid_init(struct mt76_wcid *wcid, u8 band_idx);
++-void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid);
+++void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid, bool free_hw);
++ void mt76_wcid_add_poll(struct mt76_dev *dev, struct mt76_wcid *wcid);
++ 
++ static inline void
++--- a/mt7603/main.c
+++++ b/mt7603/main.c
++@@ -108,7 +108,7 @@ mt7603_remove_interface(struct ieee80211
++ 	dev->mt76.vif_mask &= ~BIT_ULL(mvif->idx);
++ 	mutex_unlock(&dev->mt76.mutex);
++ 
++-	mt76_wcid_cleanup(&dev->mt76, &mvif->sta.wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &mvif->sta.wcid, true);
++ }
++ 
++ void mt7603_init_edcca(struct mt7603_dev *dev)
++--- a/mt7615/main.c
+++++ b/mt7615/main.c
++@@ -278,7 +278,7 @@ static void mt7615_remove_interface(stru
++ 		list_del_init(&msta->wcid.poll_list);
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ 
++-	mt76_wcid_cleanup(&dev->mt76, &mvif->sta.wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &mvif->sta.wcid, true);
++ }
++ 
++ int mt7615_set_channel(struct mt76_phy *mphy)
++--- a/mt76x02_util.c
+++++ b/mt76x02_util.c
++@@ -345,7 +345,7 @@ void mt76x02_remove_interface(struct iee
++ 
++ 	dev->mt76.vif_mask &= ~BIT_ULL(mvif->idx);
++ 	rcu_assign_pointer(dev->mt76.wcid[mvif->group_wcid.idx], NULL);
++-	mt76_wcid_cleanup(&dev->mt76, &mvif->group_wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &mvif->group_wcid, true);
++ }
++ EXPORT_SYMBOL_GPL(mt76x02_remove_interface);
++ 
++--- a/mt7915/main.c
+++++ b/mt7915/main.c
++@@ -317,7 +317,7 @@ static void mt7915_remove_interface(stru
++ 		list_del_init(&msta->wcid.poll_list);
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ 
++-	mt76_wcid_cleanup(&dev->mt76, &msta->wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &msta->wcid, true);
++ }
++ 
++ int mt7915_set_channel(struct mt76_phy *mphy)
++--- a/mt7925/main.c
+++++ b/mt7925/main.c
++@@ -1184,7 +1184,7 @@ mt7925_mac_sta_remove_links(struct mt792
++ 		mlink->pri_link = NULL;
++ 
++ 		if (link_sta != mlink->pri_link) {
++-			mt76_wcid_cleanup(mdev, wcid);
+++			mt76_wcid_cleanup(mdev, wcid, true);
++ 			mt76_wcid_mask_clear(mdev->wcid_mask, wcid->idx);
++ 		}
++ 
++--- a/mt792x_core.c
+++++ b/mt792x_core.c
++@@ -186,7 +186,7 @@ void mt792x_mac_link_bss_remove(struct m
++ 		list_del_init(&mlink->wcid.poll_list);
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ 
++-	mt76_wcid_cleanup(&dev->mt76, &mlink->wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &mlink->wcid, true);
++ }
++ EXPORT_SYMBOL_GPL(mt792x_mac_link_bss_remove);
++ 
++--- a/mt7996/main.c
+++++ b/mt7996/main.c
++@@ -423,7 +423,7 @@ void mt7996_vif_link_remove(struct mt76_
++ 		list_del_init(&msta_link->wcid.poll_list);
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ 
++-	mt76_wcid_cleanup(&dev->mt76, &msta_link->wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &msta_link->wcid, true);
++ }
++ 
++ static void mt7996_phy_set_rxfilter(struct mt7996_phy *phy)
++@@ -1005,7 +1005,7 @@ void mt7996_mac_sta_deinit_link(struct m
++ 		list_del_init(&msta_link->rc_list);
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ 
++-	mt76_wcid_cleanup(&dev->mt76, &msta_link->wcid);
+++	mt76_wcid_cleanup(&dev->mt76, &msta_link->wcid, true);
++ 	mt76_wcid_mask_clear(dev->mt76.wcid_mask, msta_link->wcid.idx);
++ }
++ 
