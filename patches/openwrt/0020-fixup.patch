@@ -1,0 +1,41 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 6 Mar 2026 12:55:35 +0100
+Subject: fixup
+
+diff --git a/package/kernel/mt76/patches/999-fixup.patch b/package/kernel/mt76/patches/999-fixup.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..82ffef349a2dbabfedda66c94afe5dc5f8e0b3f5
+--- /dev/null
++++ b/package/kernel/mt76/patches/999-fixup.patch
+@@ -0,0 +1,31 @@
++From bda3b9e49292302441cbe49690651cb01cea12fb Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 6 Mar 2026 12:54:55 +0100
++Subject: [PATCH] fixup! wifi: mt76: avoid double-free of SKB
++
++---
++ mac80211.c | 7 +++----
++ 1 file changed, 3 insertions(+), 4 deletions(-)
++
++diff --git a/mac80211.c b/mac80211.c
++index c9f93d36..205def17 100644
++--- a/mac80211.c
+++++ b/mac80211.c
++@@ -1710,11 +1710,10 @@ void mt76_wcid_cleanup(struct mt76_dev *dev, struct mt76_wcid *wcid, bool free_h
++ 	struct sk_buff_head list;
++ 	struct sk_buff *skb;
++ 
++-	if (free_hw) {
++-		mt76_tx_status_lock(dev, &list);
+++	mt76_tx_status_lock(dev, &list);
+++	if (free_hw)
++ 		mt76_tx_status_skb_get(dev, wcid, -1, &list);
++-		mt76_tx_status_unlock(dev, &list);
++-	}
+++	mt76_tx_status_unlock(dev, &list);
++ 
++ 	idr_destroy(&wcid->pktid);
++ 
++-- 
++2.51.0
++
