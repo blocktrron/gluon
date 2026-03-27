@@ -1,0 +1,507 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 27 Mar 2026 10:42:19 +0100
+Subject: mt76: import PS sync
+
+diff --git a/package/kernel/mt76/patches/9990-wifi-mt76-tx-limit-PS-TX-abort-to-non-HW-managed-TXQ.patch b/package/kernel/mt76/patches/9990-wifi-mt76-tx-limit-PS-TX-abort-to-non-HW-managed-TXQ.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..240ca6b8e554f4f936e1f8c8dd3db293337d5612
+--- /dev/null
++++ b/package/kernel/mt76/patches/9990-wifi-mt76-tx-limit-PS-TX-abort-to-non-HW-managed-TXQ.patch
+@@ -0,0 +1,60 @@
++From 10cdec7146d93622802025f41a3e15a2f1496793 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Thu, 19 Mar 2026 22:49:42 +0100
++Subject: [PATCH 9990/9993] wifi: mt76: tx: limit PS TX abort to non-HW managed
++ TXQs
++
++Only abort TX for STAs in PS in case the TXQ is not managed in hardware.
++
++This is a preperation to transition PS state on the host for such
++HW-managed TXQ platforms, as they require to have sufficient frames
++available in hardware for PS to work properly.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ tx.c | 15 +++++++++++++--
++ 1 file changed, 13 insertions(+), 2 deletions(-)
++
++diff --git a/tx.c b/tx.c
++index 22f9690634c94..3bbb6cabe3d7f 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -467,6 +467,17 @@ mt76_txq_stopped(struct mt76_queue *q)
++ 	       q->queued + MT_TXQ_FREE_THR >= q->ndesc;
++ }
++ 
+++static bool
+++mt76_txq_ps_stopped(struct mt76_dev *dev, struct mt76_wcid *wcid)
+++{
+++	/* If PS state is managed in hardware, ensure enough frames are buffered */
+++	if (dev->drv->drv_flags & MT_DRV_HW_MGMT_TXQ) {
+++		return false;
+++	}
+++
+++	return test_bit(MT_WCID_FLAG_PS, &wcid->flags);
+++}
+++
++ static int
++ mt76_txq_send_burst(struct mt76_phy *phy, struct mt76_queue *q,
++ 		    struct mt76_txq *mtxq, struct mt76_wcid *wcid)
++@@ -480,7 +491,7 @@ mt76_txq_send_burst(struct mt76_phy *phy, struct mt76_queue *q,
++ 	bool stop = false;
++ 	int idx;
++ 
++-	if (test_bit(MT_WCID_FLAG_PS, &wcid->flags))
+++	if (mt76_txq_ps_stopped(dev, wcid))
++ 		return 0;
++ 
++ 	if (atomic_read(&wcid->non_aql_packets) >= MT_MAX_NON_AQL_PKT)
++@@ -552,7 +563,7 @@ mt76_txq_schedule_list(struct mt76_phy *phy, enum mt76_txq_id qid)
++ 
++ 		mtxq = (struct mt76_txq *)txq->drv_priv;
++ 		wcid = __mt76_wcid_ptr(dev, mtxq->wcid);
++-		if (!wcid || test_bit(MT_WCID_FLAG_PS, &wcid->flags))
+++		if (!wcid || mt76_txq_ps_stopped(dev, wcid))
++ 			continue;
++ 
++ 		if (atomic_read(&wcid->non_aql_packets) >= MT_MAX_NON_AQL_PKT)
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/9991-wifi-mt76-tx-count-pending-frames-per-AC.patch b/package/kernel/mt76/patches/9991-wifi-mt76-tx-count-pending-frames-per-AC.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad86cae73cf177ef5bd8e27c6056b5ec7ae509fb
+--- /dev/null
++++ b/package/kernel/mt76/patches/9991-wifi-mt76-tx-count-pending-frames-per-AC.patch
+@@ -0,0 +1,78 @@
++From 21504b0bcb63de133acd827749a2d375be104bac Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Thu, 19 Mar 2026 23:06:06 +0100
++Subject: [PATCH 9991/9993] wifi: mt76: tx: count pending frames per AC
++
++Count the frames pending for each AC per wcid.
++
++This is required for HW managed TXQ platforms to transition into PS once
++enought frames are sent to the hardware for PS offloading to work.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt76.h |  1 +
++ tx.c   | 17 +++++++++++++++++
++ 2 files changed, 18 insertions(+)
++
++diff --git a/mt76.h b/mt76.h
++index 527bef97e122a..8dfcca23997da 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -380,6 +380,7 @@ struct mt76_wcid {
++ 	struct mt76_rx_tid __rcu *aggr[IEEE80211_NUM_TIDS];
++ 
++ 	atomic_t non_aql_packets;
+++	atomic_t pending_frames;
++ 	unsigned long flags;
++ 
++ 	struct ewma_signal rssi;
++diff --git a/tx.c b/tx.c
++index 3bbb6cabe3d7f..eb05135dee4c8 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -250,6 +250,19 @@ mt76_tx_check_non_aql(struct mt76_dev *dev, struct mt76_wcid *wcid,
++ 	}
++ }
++ 
+++static void
+++mt76_tx_check_pending(struct mt76_wcid *wcid)
+++{
+++	int pending;
+++
+++	if (!wcid || !wcid->sta)
+++		return;
+++
+++	pending = atomic_dec_return(&wcid->pending_frames);
+++	if (pending < 0)
+++		atomic_cmpxchg(&wcid->pending_frames, pending, 0);
+++}
+++
++ void __mt76_tx_complete_skb(struct mt76_dev *dev, u16 wcid_idx, struct sk_buff *skb,
++ 			    struct list_head *free_list)
++ {
++@@ -266,6 +279,7 @@ void __mt76_tx_complete_skb(struct mt76_dev *dev, u16 wcid_idx, struct sk_buff *
++ 
++ 	wcid = __mt76_wcid_ptr(dev, wcid_idx);
++ 	mt76_tx_check_non_aql(dev, wcid, skb);
+++	mt76_tx_check_pending(wcid);
++ 
++ #ifdef CONFIG_NL80211_TESTMODE
++ 	if (mt76_is_testmode_skb(dev, skb, &hw)) {
++@@ -325,11 +339,14 @@ __mt76_tx_queue_skb(struct mt76_phy *phy, int qid, struct sk_buff *skb,
++ 		return idx;
++ 
++ 	wcid = (struct mt76_wcid *)sta->drv_priv;
+++
++ 	if (!wcid->sta)
++ 		return idx;
++ 
++ 	q->entry[idx].wcid = wcid->idx;
++ 
+++	atomic_inc(&wcid->pending_frames);
+++
++ 	if (!non_aql)
++ 		return idx;
++ 
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/9992-wifi-mt76-add-TX-limit-for-hardware-offloaded-powers.patch b/package/kernel/mt76/patches/9992-wifi-mt76-add-TX-limit-for-hardware-offloaded-powers.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b7b1534e01b90d47e8fc02573c15d20ba4bbfd7
+--- /dev/null
++++ b/package/kernel/mt76/patches/9992-wifi-mt76-add-TX-limit-for-hardware-offloaded-powers.patch
+@@ -0,0 +1,135 @@
++From b1744071b94d0241c9b304193d91f4323041f567 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 27 Mar 2026 09:54:22 +0100
++Subject: [PATCH 9992/9993] wifi: mt76: add TX limit for hardware-offloaded
++ powersave
++
++Add a mechanism to support delayed host powersave entry on platforms
++which manage powersave on the target.
++
++This is required, as offloaded powersave keeps frames in the hardware.
++We need to detect the powersave transition however, as pending frames
++are still counted for per-TXQ AQL limits.
++
++Add a now flag (PS_HOST) which is set once mac80211 is informed of the
++active PS transition.
++
++Also add a upper limit until which frames are still queued to the
++hardware in case driver is informed about active PS state.
++
++Notification of the mac80211 subsystem on reaching this limit or other
++factors (timeouts etc.) is done by the individual chip implementation.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt76.h |  3 +++
++ tx.c   | 37 +++++++++++++++++++++++++++++++++++--
++ 2 files changed, 38 insertions(+), 2 deletions(-)
++
++diff --git a/mt76.h b/mt76.h
++index 8dfcca23997da..a2788880dbf9a 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -25,6 +25,7 @@
++ #define MT_SKB_HEAD_LEN		256
++ 
++ #define MT_MAX_NON_AQL_PKT	16
+++#define MT_MAX_PENDING_PS_FRAMES	8	
++ #define MT_TXQ_FREE_THR		32
++ 
++ #define MT76_TOKEN_FREE_THR	64
++@@ -359,6 +360,7 @@ struct mt76_sta_stats {
++ enum mt76_wcid_flags {
++ 	MT_WCID_FLAG_CHECK_PS,
++ 	MT_WCID_FLAG_PS,
+++	MT_WCID_FLAG_PS_HOST,
++ 	MT_WCID_FLAG_4ADDR,
++ 	MT_WCID_FLAG_HDR_TRANS,
++ };
++@@ -1553,6 +1555,7 @@ void mt76_rx_aggr_stop(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tid);
++ void mt76_wcid_key_setup(struct mt76_dev *dev, struct mt76_wcid *wcid,
++ 			 struct ieee80211_key_conf *key);
++ 
+++bool mt76_tx_sta_ps_overlimit(struct mt76_dev *dev, struct mt76_wcid *wcid);
++ void mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
++ 			 __acquires(&dev->status_lock);
++ void mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
++diff --git a/tx.c b/tx.c
++index eb05135dee4c8..a9678b22f2f0c 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -14,6 +14,30 @@ mt76_txq_get_qid(struct ieee80211_txq *txq)
++ 	return txq->ac;
++ }
++ 
+++bool
+++mt76_tx_sta_ps_overlimit(struct mt76_dev *dev, struct mt76_wcid *wcid)
+++{
+++	if (!(dev->drv->drv_flags & MT_DRV_HW_MGMT_TXQ))
+++		return false;
+++
+++	if (!test_bit(MT_WCID_FLAG_PS, &wcid->flags))
+++		return false;
+++
+++	if (test_bit(MT_WCID_FLAG_PS_HOST, &wcid->flags))
+++		return true;
+++
+++	return atomic_read(&wcid->pending_frames) >= MT_MAX_PENDING_PS_FRAMES;
+++}
+++
+++static bool
+++mt76_tx_sta_overlimit(struct mt76_dev *dev, struct mt76_wcid *wcid)
+++{
+++	if (atomic_read(&wcid->non_aql_packets) >= MT_MAX_NON_AQL_PKT)
+++		return true;
+++
+++	return mt76_tx_sta_ps_overlimit(dev, wcid);
+++}
+++
++ void
++ mt76_tx_check_agg_ssn(struct ieee80211_sta *sta, struct sk_buff *skb)
++ {
++@@ -346,6 +370,8 @@ __mt76_tx_queue_skb(struct mt76_phy *phy, int qid, struct sk_buff *skb,
++ 	q->entry[idx].wcid = wcid->idx;
++ 
++ 	atomic_inc(&wcid->pending_frames);
+++	if (stop && mt76_tx_sta_ps_overlimit(dev, wcid))
+++		*stop = true;
++ 
++ 	if (!non_aql)
++ 		return idx;
++@@ -511,7 +537,7 @@ mt76_txq_send_burst(struct mt76_phy *phy, struct mt76_queue *q,
++ 	if (mt76_txq_ps_stopped(dev, wcid))
++ 		return 0;
++ 
++-	if (atomic_read(&wcid->non_aql_packets) >= MT_MAX_NON_AQL_PKT)
+++	if (mt76_tx_sta_overlimit(dev, wcid))
++ 		return 0;
++ 
++ 	skb = mt76_txq_dequeue(phy, mtxq);
++@@ -583,7 +609,7 @@ mt76_txq_schedule_list(struct mt76_phy *phy, enum mt76_txq_id qid)
++ 		if (!wcid || mt76_txq_ps_stopped(dev, wcid))
++ 			continue;
++ 
++-		if (atomic_read(&wcid->non_aql_packets) >= MT_MAX_NON_AQL_PKT)
+++		if (mt76_tx_sta_overlimit(dev, wcid))
++ 			continue;
++ 
++ 		phy = mt76_dev_phy(dev, wcid->phy_idx);
++@@ -672,6 +698,13 @@ mt76_txq_schedule_pending_wcid(struct mt76_phy *phy, struct mt76_wcid *wcid,
++ 			break;
++ 		}
++ 
+++		if ((dev->drv->drv_flags & MT_DRV_HW_MGMT_TXQ) &&
+++		    qid != MT_TXQ_PSD &&
+++		    test_bit(MT_WCID_FLAG_PS_HOST, &wcid->flags)) {
+++			ret = -1;
+++			break;
+++		}
+++
++ 		__skb_unlink(skb, head);
++ 		spin_unlock(&head->lock);
++ 
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/9993-wifi-mt76-mt7915-implement-mac80211-subsys-PS-transi.patch b/package/kernel/mt76/patches/9993-wifi-mt76-mt7915-implement-mac80211-subsys-PS-transi.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..af2aebbfd96473096d78ae8d90e05c5da3427e7a
+--- /dev/null
++++ b/package/kernel/mt76/patches/9993-wifi-mt76-mt7915-implement-mac80211-subsys-PS-transi.patch
+@@ -0,0 +1,206 @@
++From a6b52988c77c639adbc26c5b7a799c98e76c987d Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Tue, 10 Feb 2026 21:19:14 +0100
++Subject: [PATCH 9993/9993] wifi: mt76: mt7915: implement mac80211 subsys PS
++ transition
++
++Transition to PS state for the mac80211 subsystem as soon as we have
++enough frames queued in HW to have HW offloaded powersave handling
++working.
++
++This avoids queueing excessive frames for stations in PS. With multiple
++stations (16+) connected to an AP, this can result in massively degraded
++performance despite enough tokens still being available.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7915/mac.c    | 36 +++++++++++++++++++++++++++++++++
++ mt7915/main.c   |  1 +
++ mt7915/mcu.c    | 53 +++++++++++++++++++++++++++++++++++++++++++++++++
++ mt7915/mcu.h    |  9 +++++++++
++ mt7915/mt7915.h |  5 +++++
++ 5 files changed, 104 insertions(+)
++
++diff --git a/mt7915/mac.c b/mt7915/mac.c
++index cec2c4208255f..a945e3951f2f7 100644
++--- a/mt7915/mac.c
+++++ b/mt7915/mac.c
++@@ -1983,6 +1983,40 @@ void mt7915_mac_sta_rc_work(struct work_struct *work)
++ 	spin_unlock_bh(&dev->mt76.sta_poll_lock);
++ }
++ 
+++static void
+++mt7915_mac_ps_check_sta(void *data, struct ieee80211_sta *sta)
+++{
+++	struct mt7915_sta *msta = (struct mt7915_sta *)sta->drv_priv;
+++	int pending_frames = atomic_read(&msta->wcid.pending_frames);
+++
+++	/* No power save */
+++	if (!test_bit(MT_WCID_FLAG_PS, &msta->wcid.flags))
+++		return;
+++
+++	/* Host already informed */
+++	if (test_bit(MT_WCID_FLAG_PS_HOST, &msta->wcid.flags))
+++		return;
+++
+++	/* No pending frames */
+++	if (pending_frames == 0)
+++		goto out;
+++
+++	spin_lock_bh(&msta->ps_lock);
+++	/* Check again under lock if STA is still in power save */
+++	if (!test_bit(MT_WCID_FLAG_PS, &msta->wcid.flags))
+++		goto out;
+++
+++	if (pending_frames < MT_MAX_PENDING_PS_FRAMES &&
+++	    !time_after(jiffies, msta->last_ps_transition +
+++			msecs_to_jiffies(MT7915_PS_HOST_TIMEOUT_MS)))
+++		goto out;
+++
+++	set_bit(MT_WCID_FLAG_PS_HOST, &msta->wcid.flags);
+++	ieee80211_sta_ps_transition_ni(sta, true);
+++out:
+++	spin_unlock_bh(&msta->ps_lock);
+++}
+++
++ void mt7915_mac_work(struct work_struct *work)
++ {
++ 	struct mt7915_phy *phy;
++@@ -2003,6 +2037,8 @@ void mt7915_mac_work(struct work_struct *work)
++ 
++ 		if (phy->dev->muru_debug)
++ 			mt7915_mcu_muru_debug_get(phy);
+++
+++		ieee80211_iterate_stations_atomic(hw, mt7915_mac_ps_check_sta, NULL);
++ 	}
++ 
++ 	mutex_unlock(&mphy->dev->mutex);
++diff --git a/mt7915/main.c b/mt7915/main.c
++index e1d83052aa6dd..ef463934625e7 100644
++--- a/mt7915/main.c
+++++ b/mt7915/main.c
++@@ -754,6 +754,7 @@ int mt7915_mac_sta_add(struct mt76_dev *mdev, struct ieee80211_vif *vif,
++ 
++ 	INIT_LIST_HEAD(&msta->rc_list);
++ 	INIT_LIST_HEAD(&msta->wcid.poll_list);
+++	spin_lock_init(&msta->ps_lock);
++ 	msta->vif = mvif;
++ 	msta->wcid.sta_disabled = 1;
++ 	msta->wcid.idx = idx;
++diff --git a/mt7915/mcu.c b/mt7915/mcu.c
++index 318c381494637..313e9d3cd5dad 100644
++--- a/mt7915/mcu.c
+++++ b/mt7915/mcu.c
++@@ -402,6 +402,56 @@ mt7915_mcu_rx_bcc_notify(struct mt7915_dev *dev, struct sk_buff *skb)
++ 			mt7915_mcu_cca_finish, mphy->hw);
++ }
++ 
+++static void mt7915_mcu_rx_ps_sync(struct mt7915_dev *dev, struct sk_buff *skb)
+++{
+++	struct mt7915_mcu_ps_notify *p;
+++	struct ieee80211_sta *sta;
+++	struct mt7915_sta *msta;
+++	struct mt76_wcid *wcid;
+++	u16 wcid_idx;
+++
+++	p = (struct mt7915_mcu_ps_notify *)skb->data;
+++	wcid_idx = p->wtbl_lower | (p->wtbl_higher) << 8;
+++
+++	rcu_read_lock();
+++	wcid = mt76_wcid_ptr(dev, wcid_idx);
+++	if (!wcid)
+++		goto out;
+++
+++	sta = wcid_to_sta(wcid);
+++	if (!sta)
+++		goto out;
+++
+++	msta = (struct mt7915_sta *)sta->drv_priv;
+++
+++	if ((!!p->ps_bit) == !!test_bit(MT_WCID_FLAG_PS, &wcid->flags))
+++		return;
+++
+++	spin_lock_bh(&msta->ps_lock);
+++	msta->last_ps_transition = jiffies;
+++
+++	if (p->ps_bit)
+++		set_bit(MT_WCID_FLAG_PS, &wcid->flags);
+++	else
+++		clear_bit(MT_WCID_FLAG_PS, &wcid->flags);
+++
+++	if (p->ps_bit &&
+++	    atomic_read(&msta->wcid.pending_frames) >= MT_MAX_PENDING_PS_FRAMES) {
+++		/* Block only if we already have the maximum number of
+++		 * buffered frames queued in hardware.
+++		 */
+++		set_bit(MT_WCID_FLAG_PS_HOST, &wcid->flags);
+++		ieee80211_sta_ps_transition_ni(sta, true);	
+++	} else if (!p->ps_bit) {
+++		clear_bit(MT_WCID_FLAG_PS_HOST, &wcid->flags);
+++		ieee80211_sta_ps_transition_ni(sta, false);
+++	}
+++	spin_unlock_bh(&msta->ps_lock);
+++
+++out:
+++	rcu_read_unlock();
+++}
+++
++ static void
++ mt7915_mcu_rx_ext_event(struct mt7915_dev *dev, struct sk_buff *skb)
++ {
++@@ -424,6 +474,9 @@ mt7915_mcu_rx_ext_event(struct mt7915_dev *dev, struct sk_buff *skb)
++ 	case MCU_EXT_EVENT_BCC_NOTIFY:
++ 		mt7915_mcu_rx_bcc_notify(dev, skb);
++ 		break;
+++	case MCU_EXT_EVENT_PS_SYNC:
+++		mt7915_mcu_rx_ps_sync(dev, skb);
+++		break;
++ 	default:
++ 		break;
++ 	}
++diff --git a/mt7915/mcu.h b/mt7915/mcu.h
++index 22f73a5ed4259..cc37437e8f76b 100644
++--- a/mt7915/mcu.h
+++++ b/mt7915/mcu.h
++@@ -54,6 +54,15 @@ struct mt7915_mcu_bcc_notify {
++ 	u8 rsv;
++ } __packed;
++ 
+++struct mt7915_mcu_ps_notify {
+++	struct mt76_connac2_mcu_rxd_hdr rxd;
+++
+++	u8 wtbl_lower;
+++	u8 ps_bit;
+++	u8 wtbl_higher;
+++	u8 rsv;
+++} __packed;
+++
++ struct mt7915_mcu_rdd_report {
++ 	struct mt76_connac2_mcu_rxd_hdr rxd;
++ 
++diff --git a/mt7915/mt7915.h b/mt7915/mt7915.h
++index bf1d915a3ca23..50dc998aa3f09 100644
++--- a/mt7915/mt7915.h
+++++ b/mt7915/mt7915.h
++@@ -86,6 +86,8 @@
++ 
++ #define MT7915_RTS_LEN_THRES		0x92b
++ 
+++#define MT7915_PS_HOST_TIMEOUT_MS	30000
+++
++ struct mt7915_vif;
++ struct mt7915_sta;
++ struct mt7915_dfs_pulse;
++@@ -149,6 +151,9 @@ struct mt7915_sta {
++ 	unsigned long jiffies;
++ 	struct mt76_connac_sta_key_conf bip;
++ 
+++	spinlock_t ps_lock;
+++	unsigned long last_ps_transition;
+++
++ 	struct {
++ 		u8 flowid_mask;
++ 		struct mt7915_twt_flow flow[MT7915_MAX_STA_TWT_AGRT];
++-- 
++2.53.0
++
