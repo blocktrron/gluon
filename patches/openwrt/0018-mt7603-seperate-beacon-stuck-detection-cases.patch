@@ -1,0 +1,128 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Mon, 20 Apr 2026 16:05:14 +0200
+Subject: mt7603: seperate beacon stuck detection cases
+
+diff --git a/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch b/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..d526b82872f1b11b14b0407a9da614a1884f41b9
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch
+@@ -0,0 +1,118 @@
++From 59becca3489f949b67dabbb65b519ed20150cc24 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 26 Apr 2026 00:53:15 +0200
++Subject: [PATCH] wifi: mt76: mt7603: reset PSE on repeated beacon recovery
++ fail
++
++---
++ mt7603/debugfs.c |  3 ++-
++ mt7603/mac.c     | 21 +++++++++++++++++++++
++ mt7603/mt7603.h  |  5 +++++
++ 3 files changed, 28 insertions(+), 1 deletion(-)
++
++diff --git a/mt7603/debugfs.c b/mt7603/debugfs.c
++index c891ad54..62f1beda 100644
++--- a/mt7603/debugfs.c
+++++ b/mt7603/debugfs.c
++@@ -12,6 +12,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
++ 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
++ 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
++ 		[RESET_CAUSE_BEACON_STUCK] = "Beacon stuck",
+++		[RESET_CAUSE_BEACON_RECOVERY_FAILED] = "Beacon recovery failed",
++ 		[RESET_CAUSE_MCU_HANG] = "MCU hang",
++ 		[RESET_CAUSE_RESET_FAILED] = "PSE reset failed",
++ 	};
++@@ -21,7 +22,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
++ 		if (!reset_cause_str[i])
++ 			continue;
++ 
++-		seq_printf(s, "%20s: %u\n", reset_cause_str[i],
+++		seq_printf(s, "%25s: %u\n", reset_cause_str[i],
++ 			   dev->reset_cause[i]);
++ 	}
++ 
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index d3110eeb..4a1042bd 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -1455,6 +1455,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
++ 	}
++ 
++ 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+++	    dev->cur_reset_cause == RESET_CAUSE_BEACON_RECOVERY_FAILED ||
++ 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
++ 		mt7603_pse_reset(dev);
++ 
++@@ -1816,6 +1817,22 @@ out:
++ 	mt7603_adjust_sensitivity(dev);
++ }
++ 
+++static bool
+++mt7603_beacon_recovery_failed(struct mt7603_dev *dev)
+++{
+++	unsigned int reset_count = dev->reset_cause[RESET_CAUSE_BEACON_RECOVERY_FAILED];
+++
+++	if (time_is_after_jiffies(dev->beacon_recovery_last_jiffies + 30 * HZ))
+++		return false;
+++
+++	if (reset_count > dev->beacon_recovery_last + 5)
+++		dev->beacon_failed_check = MT7603_WATCHDOG_TIMEOUT;
+++
+++	dev->beacon_recovery_last = reset_count;
+++	dev->beacon_recovery_last_jiffies = jiffies;
+++	return !!dev->beacon_failed_check;
+++}
+++
++ void mt7603_mac_work(struct work_struct *work)
++ {
++ 	struct mt7603_dev *dev = container_of(work, struct mt7603_dev,
++@@ -1844,6 +1861,9 @@ void mt7603_mac_work(struct work_struct *work)
++ 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
++ 				  RESET_CAUSE_RX_PSE_BUSY,
++ 				  mt7603_rx_pse_busy) ||
+++	    mt7603_watchdog_check(dev, &dev->beacon_failed_check,
+++				  RESET_CAUSE_BEACON_RECOVERY_FAILED,
+++				  mt7603_beacon_recovery_failed) ||
++ 	    mt7603_watchdog_check(dev, &dev->beacon_check,
++ 				  RESET_CAUSE_BEACON_STUCK,
++ 				  NULL) ||
++@@ -1861,6 +1881,7 @@ void mt7603_mac_work(struct work_struct *work)
++ 				  NULL) ||
++ 	    dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
++ 		dev->beacon_check = 0;
+++		dev->beacon_failed_check = 0;
++ 		dev->tx_dma_check = 0;
++ 		dev->tx_hang_check = 0;
++ 		dev->rx_dma_check = 0;
++diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
++index 071bfab3..87dc40d8 100644
++--- a/mt7603/mt7603.h
+++++ b/mt7603/mt7603.h
++@@ -93,6 +93,7 @@ enum mt7603_reset_cause {
++ 	RESET_CAUSE_TX_BUSY,
++ 	RESET_CAUSE_RX_BUSY,
++ 	RESET_CAUSE_BEACON_STUCK,
+++	RESET_CAUSE_BEACON_RECOVERY_FAILED,
++ 	RESET_CAUSE_RX_PSE_BUSY,
++ 	RESET_CAUSE_MCU_HANG,
++ 	RESET_CAUSE_RESET_FAILED,
++@@ -141,12 +142,16 @@ struct mt7603_dev {
++ 	u8 sensitivity_limit;
++ 
++ 	u8 beacon_check;
+++	u8 beacon_failed_check;
++ 	u8 tx_hang_check;
++ 	u8 tx_dma_check;
++ 	u8 rx_dma_check;
++ 	u8 rx_pse_check;
++ 	u8 mcu_hang;
++ 
+++	unsigned int beacon_recovery_last;
+++	unsigned long beacon_recovery_last_jiffies;
+++
++ 	enum mt7603_reset_cause cur_reset_cause;
++ 
++ 	u16 tx_dma_idx[4];
++-- 
++2.53.0
++
