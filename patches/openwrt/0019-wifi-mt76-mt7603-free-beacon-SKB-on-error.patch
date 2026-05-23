@@ -1,0 +1,48 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 23 May 2026 13:00:31 +0200
+Subject: wifi: mt76: mt7603: free beacon SKB on error
+
+diff --git a/package/kernel/mt76/patches/0001-wifi-mt76-mt7603-free-beacon-SKB-on-error.patch b/package/kernel/mt76/patches/0001-wifi-mt76-mt7603-free-beacon-SKB-on-error.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..b634fae9d385253600f88fb6f7531b13444edc6d
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-wifi-mt76-mt7603-free-beacon-SKB-on-error.patch
+@@ -0,0 +1,38 @@
++From da28d3a8b7704d462a717a98c3408859c1a1382b Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 23 May 2026 07:46:12 +0200
++Subject: [PATCH] wifi: mt76: mt7603: free beacon SKB on error
++
++The SKB containing the generated beacon is not freed when the beacon
++queue is deected stuck and scheduled for recovery.
++
++Fixes potential memory leaks in case the beacon queue is detected stuck.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/beacon.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/mt7603/beacon.c b/mt7603/beacon.c
++index 300a7f9c..acca9813 100644
++--- a/mt7603/beacon.c
+++++ b/mt7603/beacon.c
++@@ -56,6 +56,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BCN));
++ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
++ 		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
+++		dev_kfree_skb(skb);
++ 		goto out;
++ 	}
++ 
++@@ -63,6 +64,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BMC));
++ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
++ 		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
+++		dev_kfree_skb(skb);
++ 		goto out;
++ 	}
++ 
++-- 
++2.53.0
++
