@@ -1,0 +1,17 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sun, 24 May 2026 08:42:13 +0200
+Subject: fixup! mt7603: seperate beacon stuck detection cases
+
+diff --git a/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch b/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch
+index d526b82872f1b11b14b0407a9da614a1884f41b9..c0109fd5c2780c4d60a846c20c48938f70fe5bf7 100644
+--- a/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch
++++ b/package/kernel/mt76/patches/0001-mt7603-seperate-beacon-stuck-detection-cases.patch
+@@ -50,7 +50,7 @@ index d3110eeb..4a1042bd 100644
+ +static bool
+ +mt7603_beacon_recovery_failed(struct mt7603_dev *dev)
+ +{
+-+	unsigned int reset_count = dev->reset_cause[RESET_CAUSE_BEACON_RECOVERY_FAILED];
+++	unsigned int reset_count = dev->reset_cause[RESET_CAUSE_BEACON_STUCK];
+ +
+ +	if (time_is_after_jiffies(dev->beacon_recovery_last_jiffies + 30 * HZ))
+ +		return false;
