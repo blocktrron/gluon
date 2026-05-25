@@ -1,0 +1,39 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Mon, 25 May 2026 15:44:28 +0200
+Subject: wifi: mt76: mt7603: RX loopback debug
+
+diff --git a/package/kernel/mt76/patches/0001-wifi-mt76-mt7603-RX-loopback-debug.patch b/package/kernel/mt76/patches/0001-wifi-mt76-mt7603-RX-loopback-debug.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..8306c6854dcba11cb60a8594b643cb19ed05a038
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-wifi-mt76-mt7603-RX-loopback-debug.patch
+@@ -0,0 +1,29 @@
++From b174e1bf225b2cbed6167bbb68de023fbdf70bed Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 25 May 2026 15:44:04 +0200
++Subject: [PATCH] wifi: mt76: mt7603: RX loopback debug
++
++---
++ mt7603/dma.c | 6 ++++++
++ 1 file changed, 6 insertions(+)
++
++diff --git a/mt7603/dma.c b/mt7603/dma.c
++index 3a168515..c4974836 100644
++--- a/mt7603/dma.c
+++++ b/mt7603/dma.c
++@@ -37,6 +37,12 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
++ 	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
++ 		goto free;
++ 
+++	if (skb_headlen(skb) < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
+++		pr_warn("RX Loopback would have crashed due to short skb\n");
+++
+++	if (!pskb_may_pull(skb, MT_TXD_SIZE + sizeof(struct ieee80211_hdr)))
+++		goto free;
+++
++ 	val = le32_to_cpu(txd[1]);
++ 	idx = FIELD_GET(MT_TXD1_WLAN_IDX, val);
++ 	skb->priority = FIELD_GET(MT_TXD1_TID, val);
++-- 
++2.53.0
++
