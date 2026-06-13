@@ -1,0 +1,464 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 13 Jun 2026 17:53:26 +0200
+Subject: mt76: mt7603: import pending PS BlockAckReq patches
+
+diff --git a/package/kernel/mt76/patches/0500-wifi-mt76-implement-tracking-for-BlockAck-requests.patch b/package/kernel/mt76/patches/0500-wifi-mt76-implement-tracking-for-BlockAck-requests.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e46cb3bd83626694dcbbc40b039d0d306715d22c
+--- /dev/null
++++ b/package/kernel/mt76/patches/0500-wifi-mt76-implement-tracking-for-BlockAck-requests.patch
+@@ -0,0 +1,257 @@
++From 93dd89a494ca64f5aae6bfaf90ecbbe1895f1ed8 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 6 Jun 2026 05:20:47 +0200
++Subject: [PATCH 500/504] wifi: mt76: implement tracking for BlockAck requests
++
++Implement a tracking mechanism for BlockAck frames.
++
++mt7603 AND mt7612 do not explicitly track the ACK state of BlockAckReq
++frames. As a workaround, they currently set the SeqNo to hardware to the
++following packet.
++
++In case this packet is not acked or a pending BlockAckReq frame itself,
++this can lead to the device reporting lost packets, ending up in a
++retransmit loop which in worst case can lead to very low throughput
++(<100 kbit/s) for a long time and sometimes broken connectivity
++altogether.
++
++This issue is somewhat hard to reproduce, but creating short, bursty
++traffic with a MacBook in power-saver mode has a good chance of
++triggering this issue within 2-5 minutes.
++
++The same issue is already present on the older Ralink wireless chips.
++
++Apply the same workaround found there, by tracking sent BlockAckReq
++frames, enabling host forward for BlockAck repsonse frames and updating
++the ACK status based on this information.
++
++Link: 84e9e8ebd369679a958200a8baca96aafb2393bb
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mac80211.c | 89 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
++ mt76.h     | 24 +++++++++++++++
++ tx.c       | 16 ++++++++++
++ 3 files changed, 129 insertions(+)
++
++diff --git a/mac80211.c b/mac80211.c
++index dd09ef1b..9c943183 100644
++--- a/mac80211.c
+++++ b/mac80211.c
++@@ -730,6 +730,9 @@ mt76_alloc_device(struct device *pdev, unsigned int size,
++ 	INIT_DELAYED_WORK(&dev->scan_work, mt76_scan_work);
++ 	spin_lock_init(&dev->scan_lock);
++ 
+++	INIT_LIST_HEAD(&dev->pending_bar_list);
+++	spin_lock_init(&dev->pending_bar_lock);
+++
++ 	for (i = 0; i < ARRAY_SIZE(dev->q_rx); i++)
++ 		skb_queue_head_init(&dev->rx_skb[i]);
++ 
++@@ -1352,6 +1355,88 @@ skip_hdr_check:
++ 		status->flag |= RX_FLAG_PN_VALIDATED;
++ }
++ 
+++static u8
+++mt76_bar_tid(struct ieee80211_bar *bar)
+++{
+++	return (__le16_to_cpu(bar->control) & IEEE80211_BAR_CTRL_TID_INFO_MASK) >>
+++	       IEEE80211_BAR_CTRL_TID_INFO_SHIFT;
+++}
+++
+++struct mt76_pending_bar *
+++mt76_pending_bar_add(struct mt76_dev *dev, struct ieee80211_bar *bar)
+++{
+++	struct mt76_pending_bar *pending;
+++
+++	pending = kzalloc(sizeof(*pending), GFP_ATOMIC);
+++	if (!pending)
+++		return NULL;
+++
+++	memcpy(pending->ra, bar->ra, ETH_ALEN);
+++	memcpy(pending->ta, bar->ta, ETH_ALEN);
+++
+++	pending->tid = mt76_bar_tid(bar);
+++	pending->ssn = __le16_to_cpu(bar->start_seq_num);
+++
+++	spin_lock_bh(&dev->pending_bar_lock);
+++	list_add_tail_rcu(&pending->list, &dev->pending_bar_list);
+++	spin_unlock_bh(&dev->pending_bar_lock);
+++
+++	return pending;
+++}
+++
+++void
+++mt76_pending_bar_ack(struct mt76_dev *dev, struct ieee80211_bar *bar)
+++{
+++	struct mt76_pending_bar *pending;
+++
+++	rcu_read_lock();
+++
+++	list_for_each_entry_rcu(pending, &dev->pending_bar_list, list) {
+++		if (!ether_addr_equal(pending->ra, bar->ta) ||
+++		    !ether_addr_equal(pending->ta, bar->ra))
+++			continue;
+++
+++		if (pending->tid != mt76_bar_tid(bar) ||
+++		    pending->ssn != __le16_to_cpu(bar->start_seq_num))
+++			continue;
+++
+++		spin_lock_bh(&dev->pending_bar_lock);
+++		pending->ack = true;
+++		spin_unlock_bh(&dev->pending_bar_lock);
+++		break;
+++	}
+++
+++	rcu_read_unlock();
+++}
+++
+++int
+++mt76_pending_bar_done(struct mt76_dev *dev, struct ieee80211_bar *bar)
+++{
+++	struct mt76_pending_bar *pending;
+++	int ret = 0;
+++
+++	rcu_read_lock();
+++	list_for_each_entry_rcu(pending, &dev->pending_bar_list, list) {
+++		if (!ether_addr_equal(pending->ra, bar->ra) ||
+++		    !ether_addr_equal(pending->ta, bar->ta))
+++			continue;
+++
+++		if (pending->tid != mt76_bar_tid(bar) ||
+++		    pending->ssn != __le16_to_cpu(bar->start_seq_num))
+++			continue;
+++
+++		ret |= !!pending->ack;
+++		spin_lock_bh(&dev->pending_bar_lock);
+++		list_del_rcu(&pending->list);
+++		spin_unlock_bh(&dev->pending_bar_lock);
+++
+++		kfree_rcu(pending, rcu_head);
+++	}
+++
+++	rcu_read_unlock();
+++	return ret;
+++}
+++
++ static void
++ mt76_airtime_report(struct mt76_dev *dev, struct mt76_rx_status *status,
++ 		    int len)
++@@ -1464,6 +1549,10 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
++ 
++ 	mt76_airtime_check(dev, skb);
++ 
+++	if (unlikely(dev->drv->drv_flags & MT_DRV_MANUAL_BAR_TRACKING) &&
+++		     ieee80211_is_back(hdr->frame_control))
+++		mt76_pending_bar_ack(dev, (struct ieee80211_bar *)hdr);
+++
++ 	if (!wcid || !wcid->sta)
++ 		return;
++ 
++diff --git a/mt76.h b/mt76.h
++index dda5034b..61328ba4 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -487,6 +487,19 @@ struct mt76_rx_tid {
++ 	struct sk_buff *reorder_buf[];
++ };
++ 
+++struct mt76_pending_bar {
+++	struct list_head list;
+++	struct rcu_head rcu_head;
+++
+++	u8 ra[ETH_ALEN];
+++	u8 ta[ETH_ALEN];
+++
+++	u16 tid;
+++	u16 ssn;
+++
+++	u8 ack:1;
+++};
+++
++ #define MT_TX_CB_DMA_DONE		BIT(0)
++ #define MT_TX_CB_TXS_DONE		BIT(1)
++ #define MT_TX_CB_TXS_FAILED		BIT(2)
++@@ -544,6 +557,7 @@ struct mt76_hw_cap {
++ 	bool has_6ghz;
++ };
++ 
+++#define MT_DRV_MANUAL_BAR_TRACKING	BIT(8)
++ #define MT_DRV_TXWI_NO_FREE		BIT(0)
++ #define MT_DRV_TX_ALIGNED4_SKBS		BIT(1)
++ #define MT_DRV_SW_RX_AIRTIME		BIT(2)
++@@ -1002,6 +1016,9 @@ struct mt76_dev {
++ 	struct list_head sta_poll_list;
++ 	spinlock_t sta_poll_lock;
++ 
+++	struct list_head pending_bar_list;
+++	spinlock_t pending_bar_lock;
+++
++ 	u32 rev;
++ 
++ 	struct tasklet_struct pre_tbtt_tasklet;
++@@ -1568,6 +1585,13 @@ void mt76_rx_aggr_stop(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tid);
++ void mt76_wcid_key_setup(struct mt76_dev *dev, struct mt76_wcid *wcid,
++ 			 struct ieee80211_key_conf *key);
++ 
+++struct mt76_pending_bar *
+++mt76_pending_bar_add(struct mt76_dev *dev, struct ieee80211_bar *bar);
+++void
+++mt76_pending_bar_ack(struct mt76_dev *dev, struct ieee80211_bar *bar);
+++int
+++mt76_pending_bar_done(struct mt76_dev *dev, struct ieee80211_bar *bar);
+++
++ void mt76_tx_status_lock(struct mt76_dev *dev, struct sk_buff_head *list)
++ 			 __acquires(&dev->status_lock);
++ void mt76_tx_status_unlock(struct mt76_dev *dev, struct sk_buff_head *list)
++diff --git a/tx.c b/tx.c
++index dc60a966..74c67ea8 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -90,6 +90,7 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 			  struct sk_buff_head *list)
++ {
++ 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+++	struct ieee80211_bar *bar = (struct ieee80211_bar *)skb->data;
++ 	struct mt76_tx_cb *cb = mt76_tx_skb_cb(skb);
++ 	u8 done = MT_TX_CB_DMA_DONE | MT_TX_CB_TXS_DONE;
++ 
++@@ -107,6 +108,16 @@ __mt76_tx_status_skb_done(struct mt76_dev *dev, struct sk_buff *skb, u8 flags,
++ 		info->flags |= IEEE80211_TX_STAT_ACK;
++ 	}
++ 
+++	/* Check if this was a BAR which is marked as acked */
+++	if (unlikely(dev->drv->drv_flags & MT_DRV_MANUAL_BAR_TRACKING) &&
+++		     ieee80211_is_back_req(bar->frame_control) &&
+++		     !(info->flags & IEEE80211_TX_STAT_ACK) &&
+++		     mt76_pending_bar_done(dev, bar)) {
+++		info->status.rates[0].count = 0;
+++		info->status.rates[0].idx = -1;
+++		info->flags |= IEEE80211_TX_STAT_ACK;
+++	}
+++
++ 	__skb_queue_tail(list, skb);
++ }
++ 
++@@ -328,6 +339,7 @@ __mt76_tx_queue_skb(struct mt76_phy *phy, int qid, struct sk_buff *skb,
++ 		    bool *stop)
++ {
++ 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+++	struct ieee80211_bar *bar = (struct ieee80211_bar *)skb->data;
++ 	struct mt76_queue *q = phy->q_tx[qid];
++ 	struct mt76_dev *dev = phy->dev;
++ 	bool non_aql;
++@@ -343,6 +355,10 @@ __mt76_tx_queue_skb(struct mt76_phy *phy, int qid, struct sk_buff *skb,
++ 	if (!wcid->sta)
++ 		return idx;
++ 
+++	if (unlikely(dev->drv->drv_flags & MT_DRV_MANUAL_BAR_TRACKING &&
+++		     ieee80211_is_back_req(bar->frame_control)))
+++		mt76_pending_bar_add(dev, bar);
+++
++ 	q->entry[idx].wcid = wcid->idx;
++ 
++ 	if (!non_aql)
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0501-wifi-mt76-mt7603-enable-BlockAck-frame-RX-to-host.patch b/package/kernel/mt76/patches/0501-wifi-mt76-mt7603-enable-BlockAck-frame-RX-to-host.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..1182ff533013aec1c6abc17f6e850da7bd6faff3
+--- /dev/null
++++ b/package/kernel/mt76/patches/0501-wifi-mt76-mt7603-enable-BlockAck-frame-RX-to-host.patch
+@@ -0,0 +1,62 @@
++From d497cdfd7295483771c5a1bc0f13e14d2f5b9806 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 6 Jun 2026 05:17:42 +0200
++Subject: [PATCH 501/504] wifi: mt76: mt7603: enable BlockAck frame RX to host
++
++Enable forwarding of received BlockAck frames to the host system. This
++is required to track the ACK state of TX BlockAckReq packets.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/init.c | 2 +-
++ mt7603/main.c | 3 ++-
++ mt7603/regs.h | 3 +++
++ 3 files changed, 6 insertions(+), 2 deletions(-)
++
++diff --git a/mt7603/init.c b/mt7603/init.c
++index 10f2ec70..b78e75bc 100644
++--- a/mt7603/init.c
+++++ b/mt7603/init.c
++@@ -181,7 +181,7 @@ mt7603_mac_init(struct mt7603_dev *dev)
++ 	mt76_set(dev, MT_WF_RMACDR, MT_WF_RMACDR_MAXLEN_20BIT);
++ 	mt76_rmw(dev, MT_WF_RMAC_MAXMINLEN, 0xffffff, 0x19000);
++ 
++-	mt76_wr(dev, MT_WF_RFCR1, 0);
+++	mt76_wr(dev, MT_WF_RFCR1, MT_WF_RFCR1_RX_BA_EN);
++ 
++ 	mt76_set(dev, MT_TMAC_TCR, MT_TMAC_TCR_RX_RIFS_MODE);
++ 
++diff --git a/mt7603/main.c b/mt7603/main.c
++index 0f3a7508..3c316cc1 100644
++--- a/mt7603/main.c
+++++ b/mt7603/main.c
++@@ -263,9 +263,10 @@ mt7603_configure_filter(struct ieee80211_hw *hw, unsigned int changed_flags,
++ 			   MT_WF_RFCR_DROP_BCAST |
++ 			   MT_WF_RFCR_DROP_DUPLICATE |
++ 			   MT_WF_RFCR_DROP_A2_BSSID |
++-			   MT_WF_RFCR_DROP_UNWANTED_CTL |
++ 			   MT_WF_RFCR_DROP_STBC_MULTI);
++ 
+++	dev->rxfilter |= MT_WF_RFCR_DROP_UNWANTED_CTL;
+++
++ 	MT76_FILTER(OTHER_BSS, MT_WF_RFCR_DROP_OTHER_TIM |
++ 			       MT_WF_RFCR_DROP_A3_MAC |
++ 			       MT_WF_RFCR_DROP_A3_BSSID);
++diff --git a/mt7603/regs.h b/mt7603/regs.h
++index 97942f5e..43d1ae43 100644
++--- a/mt7603/regs.h
+++++ b/mt7603/regs.h
++@@ -463,7 +463,10 @@ enum {
++ 
++ #define MT_WF_RMAC_CH_FREQ		MT_WF_RMAC(0x090)
++ #define MT_WF_RMAC_MAXMINLEN		MT_WF_RMAC(0x098)
+++
++ #define MT_WF_RFCR1			MT_WF_RMAC(0x0a4)
+++#define MT_WF_RFCR1_RX_BA_EN		BIT(14)
+++
++ #define MT_WF_RMAC_TMR_PA		MT_WF_RMAC(0x0e0)
++ 
++ #define MT_WF_SEC_BASE			0x21a00
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0502-wifi-mt76-mt7603-enable-SW-tracking-for-BlockAckReq-.patch b/package/kernel/mt76/patches/0502-wifi-mt76-mt7603-enable-SW-tracking-for-BlockAckReq-.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4c4f7d3feeb0799a294b664877f67684b6395145
+--- /dev/null
++++ b/package/kernel/mt76/patches/0502-wifi-mt76-mt7603-enable-SW-tracking-for-BlockAckReq-.patch
+@@ -0,0 +1,27 @@
++From 5eff0c1b21462be0085074ec26b83cf8a647708f Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 7 Jun 2026 14:03:59 +0200
++Subject: [PATCH 502/504] wifi: mt76: mt7603: enable SW tracking for
++ BlockAckReq ACK state
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/init.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/mt7603/init.c b/mt7603/init.c
++index b78e75bc..e8bbb7d2 100644
++--- a/mt7603/init.c
+++++ b/mt7603/init.c
++@@ -7,7 +7,7 @@
++ 
++ const struct mt76_driver_ops mt7603_drv_ops = {
++ 	.txwi_size = MT_TXD_SIZE,
++-	.drv_flags = MT_DRV_SW_RX_AIRTIME,
+++	.drv_flags = MT_DRV_SW_RX_AIRTIME | MT_DRV_MANUAL_BAR_TRACKING,
++ 	.survey_flags = SURVEY_INFO_TIME_TX,
++ 	.tx_prepare_skb = mt7603_tx_prepare_skb,
++ 	.tx_complete_skb = mt7603_tx_complete_skb,
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0503-wifi-mt76-send-BAR-before-queued-frame-TX-after-PS.patch b/package/kernel/mt76/patches/0503-wifi-mt76-send-BAR-before-queued-frame-TX-after-PS.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..7b8f8859cffc590fc0e874fd420a537e136447df
+--- /dev/null
++++ b/package/kernel/mt76/patches/0503-wifi-mt76-send-BAR-before-queued-frame-TX-after-PS.patch
+@@ -0,0 +1,90 @@
++From b540b98861f54d970c4203433f57c8cb9186feae Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 30 May 2026 09:38:41 +0200
++Subject: [PATCH 503/504] wifi: mt76: send BAR before queued frame TX after PS
++
++mt7603, mt7610 and mt7612 send a BlockAckReq to a STA leaving powersave.
++The current way this is implemented however is by putting the frame in
++the regular queue.
++
++This way, the BlockAckReq is sent after the pending data frames with an
++outdated SSN. This can recover itself, however especially with Apple
++devices this can cause excessive jitter in downstream for the user.
++
++Work around this by forwarding the BlockAckReq to hardware before
++delivering data frames.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ tx.c | 46 ++++++++++++++++++++++++++++++++++++++++++++--
++ 1 file changed, 44 insertions(+), 2 deletions(-)
++
++diff --git a/tx.c b/tx.c
++index 74c67ea8..2f6f2cb3 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -498,6 +498,49 @@ mt76_txq_stopped(struct mt76_queue *q)
++ 	       q->queued + MT_TXQ_FREE_THR >= q->ndesc;
++ }
++ 
+++static void
+++mt76_send_bar(struct mt76_dev *dev, struct ieee80211_vif *vif,
+++	      struct ieee80211_sta *sta, struct ieee80211_txq *txq,
+++	      u16 ssn)
+++{
+++	struct ieee80211_hw *hw = dev->phy.hw;
+++	struct mt76_wcid *wcid = (struct mt76_wcid *)sta->drv_priv;
+++	struct sk_buff *skb;
+++	struct ieee80211_bar *bar;
+++	u16 bar_control = 0;
+++	struct mt76_queue *q;
+++
+++
+++	skb = dev_alloc_skb(sizeof(*bar) + hw->extra_tx_headroom);
+++	if (!skb)
+++		return;
+++
+++	skb_reserve(skb, hw->extra_tx_headroom);
+++	bar = skb_put_zero(skb, sizeof(*bar));
+++	bar->frame_control = cpu_to_le16(IEEE80211_FTYPE_CTL |
+++					 IEEE80211_STYPE_BACK_REQ);
+++	memcpy(bar->ra, sta->addr, ETH_ALEN);
+++	memcpy(bar->ta, vif->addr, ETH_ALEN);
+++	bar_control |= (u16)IEEE80211_BAR_CTRL_ACK_POLICY_NORMAL;
+++	bar_control |= (u16)IEEE80211_BAR_CTRL_CBMTID_COMPRESSED_BA;
+++	bar_control |= (u16)(txq->tid << IEEE80211_BAR_CTRL_TID_INFO_SHIFT);
+++	bar->control = cpu_to_le16(bar_control);
+++	bar->start_seq_num = cpu_to_le16(ssn);
+++
+++	IEEE80211_SKB_CB(skb)->flags |= IEEE80211_TX_INTFL_DONT_ENCRYPT |
+++					IEEE80211_TX_CTL_REQ_TX_STATUS;
+++	
+++	skb_set_queue_mapping(skb, txq->ac);
+++
+++	/* Direct TX */
+++	q = dev->phy.q_tx[txq->ac];
+++	spin_lock(&q->lock);
+++	__mt76_tx_queue_skb(&dev->phy, txq->ac, skb, wcid, sta, NULL);
+++	dev->queue_ops->kick(dev, q);
+++	spin_unlock(&q->lock);
+++}
+++
+++
++ static int
++ mt76_txq_send_burst(struct mt76_phy *phy, struct mt76_queue *q,
++ 		    struct mt76_txq *mtxq, struct mt76_wcid *wcid)
++@@ -627,10 +670,9 @@ mt76_txq_schedule_list(struct mt76_phy *phy, enum mt76_txq_id qid)
++ 			struct ieee80211_sta *sta = txq->sta;
++ 			struct ieee80211_vif *vif = txq->vif;
++ 			u16 agg_ssn = mtxq->agg_ssn;
++-			u8 tid = txq->tid;
++ 
++ 			mtxq->send_bar = false;
++-			ieee80211_send_bar(vif, sta->addr, tid, agg_ssn);
+++			mt76_send_bar(dev, vif, sta, txq, agg_ssn);
++ 		}
++ 
++ 		if (!mt76_txq_stopped(q))
++-- 
++2.53.0
++
