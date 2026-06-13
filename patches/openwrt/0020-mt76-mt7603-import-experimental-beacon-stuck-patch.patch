@@ -1,0 +1,166 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 13 Jun 2026 17:53:43 +0200
+Subject: mt76: mt7603: import experimental beacon stuck patch
+
+diff --git a/package/kernel/mt76/patches/0504-wifi-mt76-show-TX-count-for-BCN-frames.patch b/package/kernel/mt76/patches/0504-wifi-mt76-show-TX-count-for-BCN-frames.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e3a1260180fca592187fc2f3b3028bec1c68e241
+--- /dev/null
++++ b/package/kernel/mt76/patches/0504-wifi-mt76-show-TX-count-for-BCN-frames.patch
+@@ -0,0 +1,156 @@
++From d3b77b19a7330202cbc5b46a6de7017e79e04416 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 8 Jun 2026 01:07:50 +0200
++Subject: [PATCH 504/504] wifi: mt76: show TX count for BCN frames
++
++---
++ mt76.h           |  3 ++-
++ mt7603/debugfs.c |  1 +
++ mt7603/mac.c     | 18 ++++++++++++++++++
++ mt7603/mt7603.h  |  2 ++
++ mt7615/mac.c     |  2 +-
++ mt76x02_mac.c    |  3 ++-
++ tx.c             |  4 ++++
++ 7 files changed, 30 insertions(+), 3 deletions(-)
++
++diff --git a/mt76.h b/mt76.h
++index 61328ba4..6660d5fc 100644
++--- a/mt76.h
+++++ b/mt76.h
++@@ -508,7 +508,8 @@ struct mt76_pending_bar {
++ #define MT_PACKET_ID_NO_ACK		0
++ #define MT_PACKET_ID_NO_SKB		1
++ #define MT_PACKET_ID_WED		2
++-#define MT_PACKET_ID_FIRST		3
+++#define MT_PACKET_ID_BCN		3
+++#define MT_PACKET_ID_FIRST		4
++ #define MT_PACKET_ID_HAS_RATE		BIT(7)
++ /* This is timer for when to give up when waiting for TXS callback,
++  * with starting time being the time at which the DMA_DONE callback
++diff --git a/mt7603/debugfs.c b/mt7603/debugfs.c
++index c891ad54..7a3d09e5 100644
++--- a/mt7603/debugfs.c
+++++ b/mt7603/debugfs.c
++@@ -12,6 +12,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
++ 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
++ 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
++ 		[RESET_CAUSE_BEACON_STUCK] = "Beacon stuck",
+++		[RESET_CAUSE_BEACON_TX_DEAD] = "Beacon TX dead",
++ 		[RESET_CAUSE_MCU_HANG] = "MCU hang",
++ 		[RESET_CAUSE_RESET_FAILED] = "PSE reset failed",
++ 	};
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index d3110eeb..7d329b10 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -1260,6 +1260,19 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
++ 	pid = le32_get_bits(txs_data[4], MT_TXS4_PID);
++ 	wcidx = le32_get_bits(txs_data[3], MT_TXS3_WCID);
++ 
+++	if (pid == MT_PACKET_ID_BCN) {
+++		u32 txs = le32_to_cpu(txs_data[4]);
+++		int count = FIELD_GET(MT_TXS4_TX_COUNT, txs);
+++		if (count >= 1 && dev->beacon_tx_dead_check) {
+++			pr_warn("Beacon TX recovered, failed count %d", dev->beacon_tx_dead_check);
+++			dev->beacon_tx_dead_check = 0;
+++		} else if (count == 0) {
+++			dev->beacon_tx_dead_check++;
+++			pr_warn("Beacon TX failed, failed count %d", dev->beacon_tx_dead_check);
+++		}
+++		return;
+++	}
+++
++ 	if (pid == MT_PACKET_ID_NO_ACK)
++ 		return;
++ 
++@@ -1455,6 +1468,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
++ 	}
++ 
++ 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+++	    dev->cur_reset_cause == RESET_CAUSE_BEACON_TX_DEAD ||
++ 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
++ 		mt7603_pse_reset(dev);
++ 
++@@ -1844,6 +1858,9 @@ void mt7603_mac_work(struct work_struct *work)
++ 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
++ 				  RESET_CAUSE_RX_PSE_BUSY,
++ 				  mt7603_rx_pse_busy) ||
+++		mt7603_watchdog_check(dev, &dev->beacon_tx_dead_check,
+++				  RESET_CAUSE_BEACON_TX_DEAD,
+++				  NULL) ||
++ 	    mt7603_watchdog_check(dev, &dev->beacon_check,
++ 				  RESET_CAUSE_BEACON_STUCK,
++ 				  NULL) ||
++@@ -1861,6 +1878,7 @@ void mt7603_mac_work(struct work_struct *work)
++ 				  NULL) ||
++ 	    dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
++ 		dev->beacon_check = 0;
+++		dev->beacon_tx_dead_check = 0;
++ 		dev->tx_dma_check = 0;
++ 		dev->tx_hang_check = 0;
++ 		dev->rx_dma_check = 0;
++diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
++index 071bfab3..d5fad021 100644
++--- a/mt7603/mt7603.h
+++++ b/mt7603/mt7603.h
++@@ -93,6 +93,7 @@ enum mt7603_reset_cause {
++ 	RESET_CAUSE_TX_BUSY,
++ 	RESET_CAUSE_RX_BUSY,
++ 	RESET_CAUSE_BEACON_STUCK,
+++	RESET_CAUSE_BEACON_TX_DEAD,
++ 	RESET_CAUSE_RX_PSE_BUSY,
++ 	RESET_CAUSE_MCU_HANG,
++ 	RESET_CAUSE_RESET_FAILED,
++@@ -141,6 +142,7 @@ struct mt7603_dev {
++ 	u8 sensitivity_limit;
++ 
++ 	u8 beacon_check;
+++	u8 beacon_tx_dead_check;
++ 	u8 tx_hang_check;
++ 	u8 tx_dma_check;
++ 	u8 rx_dma_check;
++diff --git a/mt7615/mac.c b/mt7615/mac.c
++index d3478390..6ae68366 100644
++--- a/mt7615/mac.c
+++++ b/mt7615/mac.c
++@@ -1478,7 +1478,7 @@ static void mt7615_mac_add_txs(struct mt7615_dev *dev, void *data)
++ 	pid = le32_get_bits(txs_data[0], MT_TXS0_PID);
++ 	wcidx = le32_get_bits(txs_data[2], MT_TXS2_WCID);
++ 
++-	if (pid == MT_PACKET_ID_NO_ACK)
+++	if (pid == MT_PACKET_ID_NO_ACK || pid == MT_PACKET_ID_BCN)
++ 		return;
++ 
++ 	if (wcidx >= MT7615_WTBL_SIZE)
++diff --git a/mt76x02_mac.c b/mt76x02_mac.c
++index 14ee5b3b..b26ba997 100644
++--- a/mt76x02_mac.c
+++++ b/mt76x02_mac.c
++@@ -559,7 +559,8 @@ void mt76x02_send_tx_status(struct mt76x02_dev *dev,
++ 	u32 ac = 0;
++ 	int len = 0;
++ 
++-	if (stat->pktid == MT_PACKET_ID_NO_ACK)
+++	if (stat->pktid == MT_PACKET_ID_NO_ACK ||
+++	    stat->pktid == MT_PACKET_ID_BCN)
++ 		return;
++ 
++ 	rcu_read_lock();
++diff --git a/tx.c b/tx.c
++index 2f6f2cb3..01ec6acd 100644
++--- a/tx.c
+++++ b/tx.c
++@@ -140,6 +140,10 @@ mt76_tx_status_skb_add(struct mt76_dev *dev, struct mt76_wcid *wcid,
++ 
++ 	memset(cb, 0, sizeof(*cb));
++ 
+++	if (ieee80211_is_mgmt(hdr->frame_control) &&
+++	    ieee80211_is_beacon(hdr->frame_control))
+++		return MT_PACKET_ID_BCN;
+++
++ 	if (!wcid || !rcu_access_pointer(dev->wcid[wcid->idx]))
++ 		return MT_PACKET_ID_NO_ACK;
++ 
++-- 
++2.53.0
++
