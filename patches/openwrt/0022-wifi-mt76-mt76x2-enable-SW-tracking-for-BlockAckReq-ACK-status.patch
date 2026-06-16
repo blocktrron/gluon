@@ -1,0 +1,36 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Tue, 16 Jun 2026 16:58:28 +0200
+Subject: wifi: mt76: mt76x2: enable SW tracking for BlockAckReq ACK status
+
+diff --git a/package/kernel/mt76/patches/0505-wifi-mt76-mt76x2-enable-SW-tracking-for-BlockAckReq-.patch b/package/kernel/mt76/patches/0505-wifi-mt76-mt76x2-enable-SW-tracking-for-BlockAckReq-.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..2eea296dbec4c7d3dbcc3f8f02c573b0ef5ff82a
+--- /dev/null
++++ b/package/kernel/mt76/patches/0505-wifi-mt76-mt76x2-enable-SW-tracking-for-BlockAckReq-.patch
+@@ -0,0 +1,26 @@
++From 905808c7afb5750af351e4d7d3a0d15dfe04646a Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Tue, 16 Jun 2026 16:56:56 +0200
++Subject: [PATCH] wifi: mt76: mt76x2: enable SW tracking for BlockAckReq ACK
++ status
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt76x2/pci.c | 1 +
++ 1 file changed, 1 insertion(+)
++
++diff --git a/mt76x2/pci.c b/mt76x2/pci.c
++index 491a3292..53b4cd59 100644
++--- a/mt76x2/pci.c
+++++ b/mt76x2/pci.c
++@@ -23,6 +23,7 @@ mt76x2e_probe(struct pci_dev *pdev, const struct pci_device_id *id)
++ 		.txwi_size = sizeof(struct mt76x02_txwi),
++ 		.drv_flags = MT_DRV_TX_ALIGNED4_SKBS |
++ 			     MT_DRV_SW_RX_AIRTIME |
+++			     MT_DRV_MANUAL_BAR_TRACKING |
++ 			     MT_DRV_IGNORE_TXS_FAILED,
++ 		.survey_flags = SURVEY_INFO_TIME_TX,
++ 		.update_survey = mt76x02_update_channel,
++-- 
++2.53.0
++
