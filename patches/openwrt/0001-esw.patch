@@ -1,0 +1,25 @@
+From 4c4bd3f069b48e704736246ebde3b5dcd067b948 Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Tue, 21 Jul 2026 21:46:31 +0200
+Subject: [PATCH] esw
+
+---
+ .../linux/ramips/files/drivers/net/ethernet/ralink/esw_rt3050.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/target/linux/ramips/files/drivers/net/ethernet/ralink/esw_rt3050.c b/target/linux/ramips/files/drivers/net/ethernet/ralink/esw_rt3050.c
+index 75464adf53..6325456408 100644
+--- a/target/linux/ramips/files/drivers/net/ethernet/ralink/esw_rt3050.c
++++ b/target/linux/ramips/files/drivers/net/ethernet/ralink/esw_rt3050.c
+@@ -454,7 +454,7 @@ static void esw_hw_init(struct rt305x_esw *esw)
+ 	u8 port_map = RT305X_ESW_PMAP_LLLLLL;
+ 
+ 	/* vodoo from original driver */
+-	esw_w32(esw, 0xC8A07850, RT305X_ESW_REG_FCT0);
++	//esw_w32(esw, 0xC8A07850, RT305X_ESW_REG_FCT0);
+ 	esw_w32(esw, 0x00000000, RT305X_ESW_REG_SGC2);
+ 	/* Port priority 1 for all ports, vlan enabled. */
+ 	esw_w32(esw, 0x00005555 |
+-- 
+2.53.0
+
