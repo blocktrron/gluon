@@ -1,6 +1,7 @@
 $(eval $(call GluonTarget,armsr,armv7))
 $(eval $(call GluonTarget,armsr,armv8))
 $(eval $(call GluonTarget,ath79,generic))
+$(eval $(call GluonTarget,ath79,generic,tiny))
 $(eval $(call GluonTarget,ath79,nand))
 $(eval $(call GluonTarget,ath79,mikrotik))
 $(eval $(call GluonTarget,bcm27xx,bcm2708))

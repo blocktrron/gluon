@@ -91,7 +91,7 @@ local profile_json_dest = string.format('%s/openwrt-profiles/%s.json',
 lib.exec {'cp', profile_json_source, profile_json_dest}
 
 -- Copy opkg repo
-if (env.GLUON_DEVICES or '') == '' then
+if (env.GLUON_DEVICES or '') == '' and string.match(target, 'tiny$') == nil then
 	local package_prefix = string.format('gluon-%s-%s', lib.site_code, env.GLUON_RELEASE)
 	local function dest_dir(prefix)
 		return env.GLUON_PACKAGEDIR..'/'..prefix..'/'..bindir

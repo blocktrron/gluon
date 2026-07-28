@@ -125,7 +125,7 @@ update-ci: FORCE
 GLUON_TARGETS :=
 
 define GluonTarget
-gluon_target := $(1)$$(if $(2),-$(2))
+gluon_target := $(1)$$(if $(2),-$(2))$$(if $(3),-$(3))
 GLUON_TARGETS += $$(gluon_target)
 GLUON_TARGET_$$(gluon_target)_BOARD := $(1)
 GLUON_TARGET_$$(gluon_target)_SUBTARGET := $(2)

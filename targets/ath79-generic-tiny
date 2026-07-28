@@ -1,0 +1,156 @@
+-- enforce mainline ath10k kmod/firmware over openwrt default ath10k-ct usage
+-- ath10k-ct is unstable/broken with 11s meshing, works only wave2 chipsets
+
+local ATH10K_PACKAGES_QCA9880 = {
+	'kmod-ath10k',
+	'-kmod-ath10k-ct',
+	'-kmod-ath10k-ct-smallbuffers',
+	'ath10k-firmware-qca988x',
+	'-ath10k-firmware-qca988x-ct',
+}
+
+local ATH10K_PACKAGES_QCA9887 = {
+	'kmod-ath10k',
+	'-kmod-ath10k-ct',
+	'-kmod-ath10k-ct-smallbuffers',
+	'ath10k-firmware-qca9887',
+	'-ath10k-firmware-qca9887-ct',
+}
+
+local ATH10K_PACKAGES_QCA9984 = {
+	'kmod-ath10k',
+	'-kmod-ath10k-ct',
+	'-kmod-ath10k-ct-smallbuffers',
+	'ath10k-firmware-qca9984',
+	'-ath10k-firmware-qca9984-ct',
+}
+
+-- enforce mainline ath10k-smallbuffers kmod, fixes 5GHz-OOM for low memory devices
+
+local ATH10K_PACKAGES_SMALLBUFFERS_QCA9880 = {
+	'kmod-ath10k-smallbuffers',
+	'-kmod-ath10k-ct',
+	'-kmod-ath10k-ct-smallbuffers',
+	'ath10k-firmware-qca988x',
+	'-ath10k-firmware-qca988x-ct',
+}
+
+local ATH10K_PACKAGES_SMALLBUFFERS_QCA9887 = {
+	'kmod-ath10k-smallbuffers',
+	'-kmod-ath10k-ct',
+	'-kmod-ath10k-ct-smallbuffers',
+	'ath10k-firmware-qca9887',
+	'-ath10k-firmware-qca9887-ct',
+}
+
+local ATH10K_PACKAGES_QCA9888 = {}
+
+config('ALL_NONSHARED', false)
+
+-- OpenMesh
+
+device('openmesh-a40', 'openmesh_a40', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('openmesh-a60', 'openmesh_a60', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('openmesh-mr600-v1', 'openmesh_mr600-v1', {
+	factory = false,
+})
+
+device('openmesh-mr600-v2', 'openmesh_mr600-v2', {
+	factory = false,
+})
+
+device('openmesh-mr900-v1', 'openmesh_mr900-v1', {
+	factory = false,
+})
+
+device('openmesh-mr900-v2', 'openmesh_mr900-v2', {
+	factory = false,
+})
+
+device('openmesh-mr1750-v1', 'openmesh_mr1750-v1', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('openmesh-mr1750-v2', 'openmesh_mr1750-v2', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('openmesh-om2p-v1', 'openmesh_om2p-v1', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-v2', 'openmesh_om2p-v2', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-v4', 'openmesh_om2p-v4', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-hs-v1', 'openmesh_om2p-hs-v1', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-hs-v2', 'openmesh_om2p-hs-v2', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-hs-v3', 'openmesh_om2p-hs-v3', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-hs-v4', 'openmesh_om2p-hs-v4', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om2p-lc', 'openmesh_om2p-lc', {
+	class = 'tiny',
+	factory = false,
+})
+
+device('openmesh-om5p', 'openmesh_om5p', {
+	factory = false,
+})
+
+device('openmesh-om5p-ac-v1', 'openmesh_om5p-ac-v1', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('openmesh-om5p-ac-v2', 'openmesh_om5p-ac-v2', {
+	packages = ATH10K_PACKAGES_QCA9880,
+	factory = false,
+})
+
+device('openmesh-om5p-an', 'openmesh_om5p-an', {
+	factory = false,
+})
+
+
+-- Plasma Cloud
+
+device('plasma-cloud-pa300', 'plasmacloud_pa300', {
+	class = 'tiny',
+})
+
+device('plasma-cloud-pa300e', 'plasmacloud_pa300e', {
+	class = 'tiny',
+})
+
