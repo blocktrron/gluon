@@ -1,0 +1,7 @@
+{
+	"update_interval": 5000,
+	"cache_timeout": 5000,
+	"preserve": {
+		"count": 10
+	}
+}

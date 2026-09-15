@@ -1,0 +1,350 @@
+#!/usr/bin/env ucode
+
+'use strict';
+
+import * as libubus from 'ubus';
+import * as uloop from 'uloop';
+import * as fs from 'fs';
+
+import * as gluon_system from 'gluon.native.system';
+
+
+let update_interval = 250; // milliseconds
+
+uloop.init();
+
+let provider = {};
+let ubus = libubus.connect();
+let update_timer;
+
+function read_json(path) {
+	if (fs.access(path, 'r')) {
+		return json(fs.readfile(path));
+	}
+	return null;
+}
+
+function load_providers() {
+	let provider_root = '/lib/gluon/statistics/provider/';
+	let all_providers = {};
+
+	for (let provider_path in fs.glob(provider_root + "*/meta.json")) {
+		if (provider_path == null)
+			return false;
+
+		let dirname = fs.dirname(provider_path);
+		if (dirname == null)
+			return false;
+
+		let object_name = substr(dirname, length(provider_root));
+		if (object_name == null || length(object_name) == 0)
+			return false;
+
+		let meta_json_path = dirname + '/meta.json';
+		let meta_json = read_json(meta_json_path);
+		if (meta_json == null)
+			return false;
+
+		let provider = {
+			object_name: object_name,
+			path: provider_path,
+			render_files: [],
+			modules: [],
+			/* For keyed, contains last output */
+			history: [],
+			meta: meta_json,
+			timestamp: 0,
+		};
+
+		if (meta_json['keyed'] == true)
+			provider['keys'] = {};
+
+		for (let template_file in fs.glob(dirname + "/modules/*.json")) {
+			if (template_file == null)
+				return false;
+			
+			let provider_info = json(fs.readfile(template_file));
+			push(provider['modules'], provider_info);
+		}
+
+		all_providers[object_name] = provider;
+	}
+
+	return all_providers;
+}
+
+function provider_cache_timeout(provider_name, timeout_name) {
+	let clock_monotonic = gluon_system.get_clock_monotonic();
+
+	if (provider[provider_name]['meta'] == null)
+		return true;
+
+	if (provider[provider_name]['meta']['update_interval'] == null)
+		return true;
+
+	if (clock_monotonic - provider[provider_name]['timestamp'] < provider[provider_name]['meta'][timeout_name])
+		return false;
+
+	return true;
+}
+
+function provider_cache_expired(provider_name) {
+	return provider_cache_timeout(provider_name, 'cache_timeout');
+}
+
+function provider_update_pending(provider_name) {
+	return provider_cache_timeout(provider_name, 'update_interval');
+}
+
+function merge_object(target, source) {
+	for (let key in source) {
+		if (source[key] == null)
+			continue;
+
+		if (target[key] != null) {
+			if (type(target[key]) == 'object' && type(source[key]) == 'object')
+				merge_object(target[key], source[key]);
+			else
+				target[key] = source[key];
+		}
+		target[key] = source[key];
+	}
+	return target;
+}
+
+function provider_get_timeout(provider_name) {
+	let default_timeout = 3600;	// 1 hour
+	if (provider[provider_name]['meta'] == null)
+		return default_timeout;
+	if (provider[provider_name]['meta']['preserve'] == null)
+		return default_timeout;
+	if (provider[provider_name]['meta']['preserve']['timeout'] == null)
+		return default_timeout;
+
+	return provider[provider_name]['meta']['preserve']['timeout'];
+}
+
+function provider_get_preservation_count(provider_name) {
+	let default_count = 10;
+	if (provider[provider_name]['meta'] == null)
+		return default_count;
+	if (provider[provider_name]['meta']['preservation_count'] == null)
+		return default_count;
+
+	return provider[provider_name]['meta']['preservation_count'];
+}
+
+function provider_is_keyed(provider_name) {
+	return provider[provider_name]['meta'] != null && provider[provider_name]['meta']['keyed'] == true;
+}
+
+function provider_init(provider_name) {
+	for (let module_info in provider[provider_name]['modules']) {
+		if (module_info == null)
+			return;
+
+		let module_object = require(module_info['module']);
+		if (module_object == null)
+			return;
+
+		/* Call render function of module */
+		if (module_object.init != null)
+			module_object.init();
+	}
+}
+
+function provider_update(provider_name) {
+	let clock_monotonic = gluon_system.get_clock_monotonic();
+	let update = false;
+
+	let merge_result = {};
+	for (let module_info in provider[provider_name]['modules']) {
+		if (module_info == null)
+			return false;
+
+		let module_object = require(module_info['module']);
+		if (module_object == null)
+			return false;
+
+		/* Call render function of module */
+		let output = module_object.render();
+
+		merge_result = merge_object(merge_result, output);
+		provider[provider_name]['output'] = merge_result;
+		provider[provider_name]['timestamp'] = clock_monotonic;
+		update = true;
+	}
+
+	let history_entry = {
+		'timestamp': time(),
+		'output': provider[provider_name]['output']
+	};
+
+	if (provider_is_keyed(provider_name)) {
+			for (let key in provider[provider_name]['output']) {
+			if (provider[provider_name]['keys'][key] == null)
+				provider[provider_name]['keys'][key] = {'history': []};
+
+			if (update) {
+				let update_object = {
+					'timestamp': history_entry['timestamp'],
+					'output': provider[provider_name]['output'][key]
+				};
+				push(provider[provider_name]['keys'][key]['history'], update_object);
+			}
+
+			/* Cleanup keyed entries. Timeout and count are per-key basis */
+			let history = provider[provider_name]['keys'][key]['history'];
+			let to_delete = length(history) - provider_get_preservation_count(provider_name);
+			for (let i = 0; i < to_delete; i++)
+				shift(history);
+
+			/* Check timeout of oldest entries */
+			let to_delete_timeout = 0;
+			let now = time();
+			for (let i = 0; i < length(history); i++) {
+				if (now - history[i]['timestamp'] > provider_get_timeout(provider_name))
+					to_delete_timeout++;
+				else
+					break;
+			}
+			for (let i = 0; i < to_delete_timeout; i++)
+				shift(history);
+		}
+	} else {
+		/* Add to history */
+		if (update)
+			push(provider[provider_name]['history'], history_entry);
+
+		/* Clean up old history entries */
+		let to_delete = length(provider[provider_name]['history']) - provider_get_preservation_count(provider_name);
+		for (let i = 0; i < to_delete; i++)
+			shift(provider[provider_name]['history']);
+	}
+	if (update && provider[provider_name]['ubus'] != null && provider[provider_name]['ubus'].subscribed())
+		provider[provider_name]['ubus'].notify('update', provider[provider_name]['output']);
+}
+
+function provider_exists(provider_name) {
+	return provider[provider_name] != null;
+}
+
+function provider_get_stats(provider_name) {
+	if (!provider_exists(provider_name))
+		return null;
+	if (provider_cache_expired(provider_name))
+		provider_update(provider_name);
+
+	return provider[provider_name]['output'];
+}
+
+function provider_get_stats_history_key(provider_name, key) {
+	if (!provider_exists(provider_name))
+		return null;
+	if (provider_cache_expired(provider_name))
+		provider_update(provider_name);
+
+	if (provider[provider_name]['keys'][key] == null)
+		return null;
+
+	return provider[provider_name]['keys'][key]['history'];
+}
+
+function provider_get_stats_key(provider_name, key) {
+	let history = provider_get_stats_history_key(provider_name, key);
+
+	if (length(history) == 0)
+		return null;
+
+	return history[0]['output'];
+}
+
+function provider_get_meta(provider_name) {
+	if (!provider_exists(provider_name))
+		return null;
+	return provider[provider_name]['meta'];
+}
+
+function provider_get_stats_history(provider_name) {
+	if (!provider_exists(provider_name))
+		return null;
+	if (provider_cache_expired(provider_name))
+		provider_update(provider_name);
+
+	return provider[provider_name]['history'];
+}
+
+function update_timer_run() {
+	/* Update all providers */
+	for (let provider_name in provider) {
+		if (!provider_cache_expired(provider_name))
+			continue;
+
+		if (!provider_update_pending(provider_name))
+			continue;
+
+		provider_update(provider_name);
+	}
+	
+	gc();
+	update_timer.set(update_interval);
+}
+
+/* Detect all providers first. This is final. */
+provider = load_providers();
+
+/* Expose all detected providers. */
+for (let p in provider) {
+	const provider_name = p;
+	let ubus_methods = {
+		'get_statistics': {
+			call: function(request, msg) {
+				return provider_get_stats(provider_name);
+			},
+			args : {}
+		},
+		'get_statistics_key': {
+			call: function(request, msg) {
+				if (request.args.key == null)
+					return null;
+
+				return provider_get_stats_key(provider_name, request.args.key);
+			},
+			args : {
+				'key': 'string'
+			}
+		},
+		'get_statistics_history': {
+			call: function(request, msg) {
+				if (provider_is_keyed(provider_name))
+					return provider[provider_name]['keys'];
+				return { 'history': provider_get_stats_history(provider_name) };
+			},
+			args : {}
+		},
+		'get_statistics_history_key': {
+			call: function(request, msg) {
+				if (request.args.key == null)
+					return null;
+
+				return provider_get_stats_history_key(provider_name, request.args.key);
+			},
+			args : {
+				'key': 'string'
+			}
+		},
+		'get_meta': {
+			call: function(request, msg) {
+				return provider_get_meta(provider_name);
+			},
+			args : {}
+		}
+	};
+	provider[provider_name]['ubus'] = ubus.publish('gluon.statistics.' + provider_name, ubus_methods);
+}
+
+/* Schedule update timer */
+update_timer = uloop.timer(update_interval, update_timer_run);
+
+/* Run the main loop */
+uloop.run();
