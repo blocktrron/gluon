@@ -16,6 +16,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+static char *fastd_secret = NULL;
+static char *fastd_public_key = NULL;
 
 static struct json_object * get_peer_groups(struct json_object *groups, struct json_object *peers);
 
@@ -51,7 +53,16 @@ static struct json_object * get_fastd_version(void) {
 	return ret;
 }
 
-static struct json_object * get_fastd_public_key(void) {
+static struct json_object * get_fastd_public_key(const char *secret) {
+	/* Return the cached public key if the secret matches */
+	if (secret && fastd_secret && fastd_public_key && strcmp(fastd_secret, secret) == 0)
+		return gluonutil_wrap_and_free_string(strdup(fastd_public_key));
+
+	free(fastd_secret);
+	fastd_secret = NULL;
+	free(fastd_public_key);
+	fastd_public_key = NULL;
+
 	FILE *f = popen("/etc/init.d/fastd show_key mesh_vpn", "r");
 	if (!f)
 		return NULL;
@@ -74,6 +85,10 @@ static struct json_object * get_fastd_public_key(void) {
 		line = NULL;
 	}
 
+	if (line) {
+		fastd_secret = strdup(secret);
+		fastd_public_key = strdup(line);
+	}
 	return gluonutil_wrap_and_free_string(line);
 }
 
@@ -122,14 +137,16 @@ static struct json_object * get_fastd(void) {
 	if (!enabled_str || !strcmp(enabled_str, "1"))
 		enabled = true;
 
+	const char *secret = uci_lookup_option_string(ctx, s, "secret");
+
 disabled:
 	uci_free_context(ctx);
 
 disabled_nofree:
 	json_object_object_add(ret, "version", get_fastd_version());
 	json_object_object_add(ret, "enabled", json_object_new_boolean(enabled));
-	if (enabled && !get_pubkey_privacy())
-		json_object_object_add(ret, "public_key", get_fastd_public_key());
+	if (enabled && secret && !get_pubkey_privacy())
+		json_object_object_add(ret, "public_key", get_fastd_public_key(secret));
 	return ret;
 }
 
