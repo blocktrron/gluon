@@ -1,4 +1,3 @@
-{%
 import * as fs from 'fs';
 
 import * as gluon_system from 'gluon.native.system';

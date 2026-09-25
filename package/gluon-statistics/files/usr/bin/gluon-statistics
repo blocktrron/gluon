@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as gluon_system from 'gluon.native.system';
 
 
-let update_interval = 250; // milliseconds
+let update_interval = 500; // milliseconds
 
 uloop.init();
 
