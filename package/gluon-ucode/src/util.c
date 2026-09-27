@@ -6,6 +6,7 @@
 #include <json-c/json.h>
 
 #include <arpa/inet.h>
+#include <net/if.h>
 
 static uc_value_t *uc_wrap_and_free_string(char *val) {
 	uc_value_t *ret;
@@ -134,6 +135,19 @@ static uc_value_t *uc_has_domains(uc_vm_t *vm, size_t nargs) {
 	return ucv_boolean_new(gluonutil_has_domains());
 }
 
+static uc_value_t *uc_if_nametoindex(uc_vm_t *vm, size_t nargs) {
+	uc_value_t *ifname_uc;
+
+	if (nargs < 1)
+		return NULL;
+
+	ifname_uc = uc_fn_arg(0);
+	if (ucv_type(ifname_uc) != UC_STRING)
+		return NULL;
+
+	return ucv_integer_new(if_nametoindex(ucv_string_get(ifname_uc)));
+}
+
 static const uc_function_list_t global_fns[] = {
 	{ "get_node_id", uc_get_node_id },
 	{ "get_domain", uc_get_domain },
@@ -144,7 +158,8 @@ static const uc_function_list_t global_fns[] = {
 	{ "get_interface_address", uc_get_interface_address },
 	{ "get_node_prefix6", uc_get_node_prefix6 },
 	{ "get_sysconfig", uc_get_sysconfig },
-	{ "has_domains", uc_has_domains }
+	{ "has_domains", uc_has_domains },
+	{ "if_nametoindex", uc_if_nametoindex },
 };
 
 void uc_module_init(uc_vm_t *vm, uc_value_t *scope) {
