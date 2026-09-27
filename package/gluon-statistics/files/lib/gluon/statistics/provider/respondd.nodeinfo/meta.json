@@ -1,4 +1,4 @@
 {
-	"update_interval": 5000,
+	"update_interval": 60000,
 	"cache_timeout": 30000
 }

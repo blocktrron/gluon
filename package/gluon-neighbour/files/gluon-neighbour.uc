@@ -6,7 +6,7 @@ import * as uloop from 'uloop';
 import * as gluon_util from 'gluon.native.util';
 import * as gluon_neighbour from 'gluon.native.neighbour';
 
-const update_interval = 2500; // milliseconds
+const update_interval = 15000; // milliseconds
 const node_id_self = gluon_util.get_node_id();
 
 uloop.init();

@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as gluon_system from 'gluon.native.system';
 
 
-let update_interval = 500; // milliseconds
+let update_interval = 2500; // milliseconds
 
 uloop.init();
 
@@ -55,9 +55,6 @@ function load_providers() {
 			meta: meta_json,
 			timestamp: 0,
 		};
-
-		if (meta_json['keyed'] == true)
-			provider['keys'] = {};
 
 		for (let template_file in fs.glob(dirname + "/modules/*.json")) {
 			if (template_file == null)
@@ -134,10 +131,6 @@ function provider_get_preservation_count(provider_name) {
 	return provider[provider_name]['meta']['preservation_count'];
 }
 
-function provider_is_keyed(provider_name) {
-	return provider[provider_name]['meta'] != null && provider[provider_name]['meta']['keyed'] == true;
-}
-
 function provider_init(provider_name) {
 	for (let module_info in provider[provider_name]['modules']) {
 		if (module_info == null)
@@ -180,47 +173,15 @@ function provider_update(provider_name) {
 		'output': provider[provider_name]['output']
 	};
 
-	if (provider_is_keyed(provider_name)) {
-			for (let key in provider[provider_name]['output']) {
-			if (provider[provider_name]['keys'][key] == null)
-				provider[provider_name]['keys'][key] = {'history': []};
+	/* Add to history */
+	if (update)
+		push(provider[provider_name]['history'], history_entry);
 
-			if (update) {
-				let update_object = {
-					'timestamp': history_entry['timestamp'],
-					'output': provider[provider_name]['output'][key]
-				};
-				push(provider[provider_name]['keys'][key]['history'], update_object);
-			}
+	/* Clean up old history entries */
+	let to_delete = length(provider[provider_name]['history']) - provider_get_preservation_count(provider_name);
+	for (let i = 0; i < to_delete; i++)
+		shift(provider[provider_name]['history']);
 
-			/* Cleanup keyed entries. Timeout and count are per-key basis */
-			let history = provider[provider_name]['keys'][key]['history'];
-			let to_delete = length(history) - provider_get_preservation_count(provider_name);
-			for (let i = 0; i < to_delete; i++)
-				shift(history);
-
-			/* Check timeout of oldest entries */
-			let to_delete_timeout = 0;
-			let now = time();
-			for (let i = 0; i < length(history); i++) {
-				if (now - history[i]['timestamp'] > provider_get_timeout(provider_name))
-					to_delete_timeout++;
-				else
-					break;
-			}
-			for (let i = 0; i < to_delete_timeout; i++)
-				shift(history);
-		}
-	} else {
-		/* Add to history */
-		if (update)
-			push(provider[provider_name]['history'], history_entry);
-
-		/* Clean up old history entries */
-		let to_delete = length(provider[provider_name]['history']) - provider_get_preservation_count(provider_name);
-		for (let i = 0; i < to_delete; i++)
-			shift(provider[provider_name]['history']);
-	}
 	if (update && provider[provider_name]['ubus'] != null && provider[provider_name]['ubus'].subscribed())
 		provider[provider_name]['ubus'].notify('update', provider[provider_name]['output']);
 }
@@ -316,8 +277,6 @@ for (let p in provider) {
 		},
 		'get_statistics_history': {
 			call: function(request, msg) {
-				if (provider_is_keyed(provider_name))
-					return provider[provider_name]['keys'];
 				return { 'history': provider_get_stats_history(provider_name) };
 			},
 			args : {}

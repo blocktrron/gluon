@@ -1,8 +1,7 @@
 {
-	"update_interval": 5000,
-	"cache_timeout": 5000,
+	"update_interval": 30000,
+	"cache_timeout": 10000,
 	"preserve": {
 		"count": 15
-	},
-	"keyed": true
+	}
 }

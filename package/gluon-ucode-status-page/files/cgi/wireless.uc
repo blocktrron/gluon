@@ -10,7 +10,9 @@ function filter_object(ubus_object) {
 					continue;
 
 				out_interfaces[interface_key] = record.output[phy_idx].interfaces[interface_key];
-				out_interfaces[interface_key].stations = [];
+				out_interfaces[interface_key].station_count = length(out_interfaces[interface_key].stations);
+				if (!match(interface_key, /^mesh[0-9]*/))
+					out_interfaces[interface_key].stations = [];
 			}
 			record.output[phy_idx].interfaces = out_interfaces;
 		}
