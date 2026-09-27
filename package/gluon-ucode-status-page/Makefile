@@ -26,6 +26,7 @@ define Package/gluon-ucode-status-page/install
 	$(INSTALL_BIN) ./files/cgi/neighbour.uc $(1)/lib/gluon/status-page/www/cgi-bin/dyn/ucode/neighbour
 	$(INSTALL_BIN) ./files/cgi/network.uc $(1)/lib/gluon/status-page/www/cgi-bin/dyn/ucode/network
 	$(INSTALL_BIN) ./files/cgi/system.uc $(1)/lib/gluon/status-page/www/cgi-bin/dyn/ucode/system
+	$(INSTALL_BIN) ./files/cgi/wireless.uc $(1)/lib/gluon/status-page/www/cgi-bin/dyn/ucode/wireless
 endef
 
 $(eval $(call BuildPackage,gluon-ucode-status-page))

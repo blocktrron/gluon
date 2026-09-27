@@ -145,7 +145,7 @@ static uc_value_t *uc_if_nametoindex(uc_vm_t *vm, size_t nargs) {
 	if (ucv_type(ifname_uc) != UC_STRING)
 		return NULL;
 
-	return ucv_integer_new(if_nametoindex(ucv_string_get(ifname_uc)));
+	return ucv_int64_new(if_nametoindex(ucv_string_get(ifname_uc)));
 }
 
 static const uc_function_list_t global_fns[] = {

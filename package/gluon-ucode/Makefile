@@ -24,6 +24,7 @@ define Package/gluon-ucode/install
 	$(CP) $(PKG_BUILD_DIR)/system.so $(1)/usr/lib/ucode/gluon/native/system.so
 
 	$(CP) ./files/pretty-hostname.uc $(1)/usr/share/ucode/gluon/pretty-hostname.uc
+	$(CP) ./files/nl80211.uc $(1)/usr/share/ucode/gluon/nl80211.uc
 endef
 
 $(eval $(call BuildPackage,gluon-ucode))
