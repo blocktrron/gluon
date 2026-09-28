@@ -55,10 +55,17 @@ export function get_interface_stations(ifname) {
 		let sta_obj = {
 			"mac": station.mac,
 			"signal": station.sta_info.signal,
+			"tx_rate": station.sta_info.tx_bitrate.bitrate32 * 100,
+			"rx_rate": station.sta_info.rx_bitrate.bitrate32 * 100,
 			"tx_bytes": station.sta_info.tx_bytes64,
 			"rx_bytes": station.sta_info.rx_bytes64,
 			"tx_packets": station.sta_info.tx_packets,
-			"rx_packets": station.sta_info.rx_packets
+			"rx_packets": station.sta_info.rx_packets,
+			"tx_retries": station.sta_info.tx_retries,
+			"tx_failed": station.sta_info.tx_failed,
+			"expected_throughput": station.sta_info.expected_throughput,
+			"connected_time": station.sta_info.connected_time,
+			"inactive_time": station.sta_info.inactive_time,
 		};
 		push(output, sta_obj);
 	}
