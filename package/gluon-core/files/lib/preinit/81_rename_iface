@@ -1,0 +1,5 @@
+do_iface_rename() {
+	/lib/gluon/rename-netif.sh preinit
+}
+
+[ "$INITRAMFS" = "1" ] || boot_hook_add preinit_main do_iface_rename

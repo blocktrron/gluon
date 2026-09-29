@@ -1,0 +1,46 @@
+#!/usr/bin/lua
+
+local platform = require 'gluon.platform'
+local util = require 'gluon.util'
+
+local unistd = require 'posix.unistd'
+local uci = require('simple-uci').cursor()
+
+if not platform.match('x86') then
+	return
+end
+
+function lookup_new_interface_name(old_name)
+	local path = '/lib/gluon/core/renamed-interfaces/' .. old_name .. '/name_new'
+	local st = unistd.access(path)
+	if st == 0 then
+		return util.readfile(path)
+	end
+	return nil
+end
+
+uci:foreach('gluon', 'interface', function(interface)
+	-- ToDo: Nobody has more than 10 eth interfaces
+	if not string.match(interface.name, '^eth[0-9]') then
+		return
+	end
+
+	local dev = string.match(interface.name, '^(eth[0-9])')
+	local vlan = nil
+	if dev ~= interface.name then
+		vlan = string.sub(interface.name, #dev + 1)
+	end
+
+	local new_name = lookup_new_interface_name(dev)
+	if new_name == nil then
+		return
+	end
+
+	new_name = util.trim(new_name)
+	if vlan then
+		new_name = new_name .. vlan
+	end
+	uci:set('gluon', interface['.name'], 'name', new_name)
+end)
+
+uci:save('gluon')

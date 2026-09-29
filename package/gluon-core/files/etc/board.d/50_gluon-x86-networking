@@ -1,0 +1,30 @@
+. /lib/functions/uci-defaults.sh
+
+OS_RELEASE="$(grep '^OPENWRT_ARCH=' /etc/os-release | cut -d '=' -f 2 | cut -d '"' -f 2)"
+if ! echo "$OS_RELEASE" | grep -q "^x86"; then
+	exit 0
+fi
+
+ETH0_RENAMED="$(cat /lib/gluon/core/renamed-interfaces/eth0/name_new 2>/dev/null)"
+if [ -z "$ETH0_RENAMED" ]; then
+	exit 0
+fi
+
+ETH1_RENAMED="$(cat /lib/gluon/core/renamed-interfaces/eth1/name_new 2>/dev/null)"
+
+board_config_update
+json_is_a network object && exit 0
+
+if [ -n "$ETH0_RENAMED" ]; then
+	ucidef_set_interface_lan "$ETH0_RENAMED"
+else
+	ucidef_set_interface_lan 'eth0'
+fi
+
+if [ -n "$ETH1_RENAMED" ]; then
+	ucidef_set_interface_wan "$ETH1_RENAMED"
+fi
+
+board_config_flush
+
+exit 0

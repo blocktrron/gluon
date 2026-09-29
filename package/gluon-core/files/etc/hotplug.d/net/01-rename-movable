@@ -1,0 +1,9 @@
+#!/bin/sh
+
+[ "$ACTION" != "add"] && exit 0
+
+case "$DEVICENAME" in
+	usb*|pci*|vio*) exit 0 ;;
+esac
+
+/lib/gluon/rename-netif.sh
