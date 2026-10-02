@@ -212,6 +212,11 @@ all: config
 	$(OPENWRTMAKE)
 	$(GLUON_ENV) $(LUA) scripts/copy_output.lua
 
+toolchain: config
+	+@
+	$(GLUON_ENV) $(LUA) scripts/clean_output.lua
+	$(OPENWRTMAKE) toolchain/install
+
 clean download: config
 	+@$(OPENWRTMAKE) $@
 
