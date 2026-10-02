@@ -1,0 +1,571 @@
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 2 Oct 2026 16:59:19 +0200
+Subject: add mt76 patches
+
+diff --git a/package/kernel/mt76/patches/0001-wifi-mt76-mt76x02-guard-QoS-control-field-read.patch b/package/kernel/mt76/patches/0001-wifi-mt76-mt76x02-guard-QoS-control-field-read.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d892e283adab11911da67e78f1e574e96735d66
+--- /dev/null
++++ b/package/kernel/mt76/patches/0001-wifi-mt76-mt76x02-guard-QoS-control-field-read.patch
+@@ -0,0 +1,38 @@
++From 3ab934ddc667bb7ede3171e60119533842e871b0 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 28 Aug 2026 16:53:55 +0200
++Subject: [PATCH 1/9] wifi: mt76: mt76x02: guard QoS control field read
++
++Guard the read of the QoS control value from the header to QoS data
++frames.
++
++This is consistent with the handling present in mt7603_mac_fill_rx
++for MT7603 radios.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt76x02_mac.c | 6 ++++--
++ 1 file changed, 4 insertions(+), 2 deletions(-)
++
++diff --git a/mt76x02_mac.c b/mt76x02_mac.c
++index 21f8b1e6..5fa26e33 100644
++--- a/mt76x02_mac.c
+++++ b/mt76x02_mac.c
++@@ -869,10 +869,12 @@ int mt76x02_mac_process_rx(struct mt76x02_dev *dev, struct sk_buff *skb,
++ 	status->freq = dev->mphy.chandef.chan->center_freq;
++ 	status->band = dev->mphy.chandef.chan->band;
++ 
++-	hdr = (struct ieee80211_hdr *)skb->data;
++-	status->qos_ctl = *ieee80211_get_qos_ctl(hdr);
++ 	status->seqno = FIELD_GET(MT_RXWI_SN, tid_sn);
++ 
+++	hdr = (struct ieee80211_hdr *)skb->data;
+++	if (ieee80211_is_data_qos(hdr->frame_control))
+++		status->qos_ctl = *ieee80211_get_qos_ctl(hdr);
+++
++ 	return mt76x02_mac_process_rate(dev, status, rate);
++ }
++ 
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0002-wifi-mt76-mt7603-check-skb_pull-return-value-in-mt76.patch b/package/kernel/mt76/patches/0002-wifi-mt76-mt7603-check-skb_pull-return-value-in-mt76.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8d263795c732404f50a344e7416db2fbec5d55d
+--- /dev/null
++++ b/package/kernel/mt76/patches/0002-wifi-mt76-mt7603-check-skb_pull-return-value-in-mt76.patch
+@@ -0,0 +1,39 @@
++From df0bedb2b876628b5270e6bc4837ffd24d7f2329 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 28 Aug 2026 17:29:06 +0200
++Subject: [PATCH 2/9] wifi: mt76: mt7603: check skb_pull() return value in
++ mt7603_mac_fill_rx
++
++The final skb_pull in mt7603_mac_fill_rx advances past the RXD
++groups plus padding, but the preceding per-group bounds checks
++don't account for the padding bytes.
++
++If the frame also requires a reinserted CCMP header,
++mt76_insert_ccmp_hdr then does an unchecked __skb_push,
++potentially corrupting memory outside the page-pool buffer.
++
++Check the return value of skb_pull to avoid this from
++happening.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/mac.c | 3 ++-
++ 1 file changed, 2 insertions(+), 1 deletion(-)
++
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index fa0bf9a2..d9f910bc 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -690,7 +690,8 @@ mt7603_mac_fill_rx(struct mt7603_dev *dev, struct sk_buff *skb)
++ 		return -EINVAL;
++ 	}
++ 
++-	skb_pull(skb, (u8 *)rxd - skb->data + 2 * remove_pad);
+++	if (!skb_pull(skb, (u8 *)rxd - skb->data + 2 * remove_pad))
+++		return -EINVAL;
++ 
++ 	if (insert_ccmp_hdr) {
++ 		u8 key_id = FIELD_GET(MT_RXD1_NORMAL_KEY_ID, rxd1);
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0003-wifi-mt76-mt7603-add-FQ-stuck-reset-cause.patch b/package/kernel/mt76/patches/0003-wifi-mt76-mt7603-add-FQ-stuck-reset-cause.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..4029610c8cbeb05b9efa926a7aa957e3f6b9e234
+--- /dev/null
++++ b/package/kernel/mt76/patches/0003-wifi-mt76-mt7603-add-FQ-stuck-reset-cause.patch
+@@ -0,0 +1,96 @@
++From ed9df28f7a85a640d7f966c87225a87aa016bb6a Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 5 Sep 2026 02:51:20 +0200
++Subject: [PATCH 3/9] wifi: mt76: mt7603: add FQ stuck reset cause
++
++The beacon stuck reset cause included the detection mechanism for a
++stuck frame queue. Seperate the detection cases to differentiate their
++handling.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/beacon.c  | 4 ++--
++ mt7603/debugfs.c | 1 +
++ mt7603/mac.c     | 4 ++++
++ mt7603/mt7603.h  | 2 ++
++ 4 files changed, 9 insertions(+), 2 deletions(-)
++
++diff --git a/mt7603/beacon.c b/mt7603/beacon.c
++index acca9813..e09622ec 100644
++--- a/mt7603/beacon.c
+++++ b/mt7603/beacon.c
++@@ -55,7 +55,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 	mt76_wr(dev, MT_DMA_FQCR0, val |
++ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BCN));
++ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
++-		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
+++		dev->fq_check = MT7603_WATCHDOG_TIMEOUT;
++ 		dev_kfree_skb(skb);
++ 		goto out;
++ 	}
++@@ -63,7 +63,7 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 	mt76_wr(dev, MT_DMA_FQCR0, val |
++ 		FIELD_PREP(MT_DMA_FQCR0_TARGET_QID, MT_TX_HW_QUEUE_BMC));
++ 	if (!mt76_poll(dev, MT_DMA_FQCR0, MT_DMA_FQCR0_BUSY, 0, 5000)) {
++-		dev->beacon_check = MT7603_WATCHDOG_TIMEOUT;
+++		dev->fq_check = MT7603_WATCHDOG_TIMEOUT;
++ 		dev_kfree_skb(skb);
++ 		goto out;
++ 	}
++diff --git a/mt7603/debugfs.c b/mt7603/debugfs.c
++index c891ad54..34f04988 100644
++--- a/mt7603/debugfs.c
+++++ b/mt7603/debugfs.c
++@@ -12,6 +12,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
++ 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
++ 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
++ 		[RESET_CAUSE_BEACON_STUCK] = "Beacon stuck",
+++		[RESET_CAUSE_FQ_STUCK] = "FQ stuck",
++ 		[RESET_CAUSE_MCU_HANG] = "MCU hang",
++ 		[RESET_CAUSE_RESET_FAILED] = "PSE reset failed",
++ 	};
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index d9f910bc..fe285b73 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -1906,6 +1906,9 @@ void mt7603_mac_work(struct work_struct *work)
++ 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
++ 				  RESET_CAUSE_RX_PSE_BUSY,
++ 				  mt7603_rx_pse_busy) ||
+++	    mt7603_watchdog_check(dev, &dev->fq_check,
+++				  RESET_CAUSE_FQ_STUCK,
+++				  NULL) ||
++ 	    mt7603_watchdog_check(dev, &dev->beacon_check,
++ 				  RESET_CAUSE_BEACON_STUCK,
++ 				  NULL) ||
++@@ -1922,6 +1925,7 @@ void mt7603_mac_work(struct work_struct *work)
++ 				  RESET_CAUSE_MCU_HANG,
++ 				  NULL) ||
++ 	    dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
+++		dev->fq_check = 0;
++ 		dev->beacon_check = 0;
++ 		dev->tx_dma_check = 0;
++ 		dev->tx_hang_check = 0;
++diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
++index 5b0ecd01..01748232 100644
++--- a/mt7603/mt7603.h
+++++ b/mt7603/mt7603.h
++@@ -93,6 +93,7 @@ enum mt7603_reset_cause {
++ 	RESET_CAUSE_TX_HANG,
++ 	RESET_CAUSE_TX_BUSY,
++ 	RESET_CAUSE_RX_BUSY,
+++	RESET_CAUSE_FQ_STUCK,
++ 	RESET_CAUSE_BEACON_STUCK,
++ 	RESET_CAUSE_RX_PSE_BUSY,
++ 	RESET_CAUSE_MCU_HANG,
++@@ -141,6 +142,7 @@ struct mt7603_dev {
++ 	s8 sensitivity;
++ 	u8 sensitivity_limit;
++ 
+++	u8 fq_check;
++ 	u8 beacon_check;
++ 	u8 tx_hang_check;
++ 	u8 tx_dma_check;
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0004-wifi-mt76-mt7603-apply-extended-PSE-reset-on-repeate.patch b/package/kernel/mt76/patches/0004-wifi-mt76-mt7603-apply-extended-PSE-reset-on-repeate.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a3ccbd1311fe1346d584a09298c10edb620b51a
+--- /dev/null
++++ b/package/kernel/mt76/patches/0004-wifi-mt76-mt7603-apply-extended-PSE-reset-on-repeate.patch
+@@ -0,0 +1,33 @@
++From f72732e9e6de987445a671935f0ec3dacdc4b21e Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sat, 5 Sep 2026 03:01:55 +0200
++Subject: [PATCH 4/9] wifi: mt76: mt7603: apply extended PSE reset on repeated
++ FQ stuck
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/mac.c | 8 ++++++++
++ 1 file changed, 8 insertions(+)
++
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index fe285b73..c034f0f7 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -1486,6 +1486,14 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
++ 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
++ 		mt7603_pse_reset(dev);
++ 
+++	if (dev->cur_reset_cause == RESET_CAUSE_FQ_STUCK &&
+++	    dev->reset_cause[RESET_CAUSE_FQ_STUCK] % 10 == 0) {
+++		dev_warn(dev->mt76.dev, "Applying extended PSE reset - FQ stuck reset count %d\n",
+++				dev->reset_cause[RESET_CAUSE_FQ_STUCK]);
+++		mt7603_pse_reset(dev);
+++	}
+++
+++
++ 	if (!dev->reset_cause[RESET_CAUSE_RESET_FAILED]) {
++ 		mt7603_mac_dma_start(dev);
++ 
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0005-wifi-mt76-mt7603-disable-PS-loopback.patch b/package/kernel/mt76/patches/0005-wifi-mt76-mt7603-disable-PS-loopback.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..f64520d9af6f4ddadb2cf95824458284b7be6102
+--- /dev/null
++++ b/package/kernel/mt76/patches/0005-wifi-mt76-mt7603-disable-PS-loopback.patch
+@@ -0,0 +1,40 @@
++From bd933f961b6d443f8c59fe23a6406a8715ec2454 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 6 Sep 2026 00:30:10 +0200
++Subject: [PATCH 5/9] wifi: mt76: mt7603: disable PS loopback
++
++---
++ mt7603/dma.c  | 2 +-
++ mt7603/main.c | 3 +++
++ 2 files changed, 4 insertions(+), 1 deletion(-)
++
++diff --git a/mt7603/dma.c b/mt7603/dma.c
++index 477a9b7a..a9cb688b 100644
++--- a/mt7603/dma.c
+++++ b/mt7603/dma.c
++@@ -34,7 +34,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
++ 	int idx;
++ 	u32 val;
++ 
++-	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
+++	if (1 || skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
++ 		goto free;
++ 
++ 	val = le32_to_cpu(txd[1]);
++diff --git a/mt7603/main.c b/mt7603/main.c
++index 757664e9..fe80fcd6 100644
++--- a/mt7603/main.c
+++++ b/mt7603/main.c
++@@ -409,6 +409,9 @@ mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
++ 	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
++ 	struct sk_buff_head list;
++ 
+++	if (1)
+++		return;
+++
++ 	mt76_stop_tx_queues(&dev->mphy, sta, true);
++ 	mt7603_wtbl_sta_ps(dev, msta, ps);
++ 	if (ps)
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0006-wifi-mt76-mt7603-add-dead-broadcast-recovery.patch b/package/kernel/mt76/patches/0006-wifi-mt76-mt7603-add-dead-broadcast-recovery.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..a0f0b41c467a192302c544013842aa900d420e5d
+--- /dev/null
++++ b/package/kernel/mt76/patches/0006-wifi-mt76-mt7603-add-dead-broadcast-recovery.patch
+@@ -0,0 +1,155 @@
++From 7890c4f45ff05ef9d4f341c7126f0e2ddfd10556 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Sun, 6 Sep 2026 22:40:29 +0200
++Subject: [PATCH 6/9] wifi: mt76: mt7603: add dead broadcast recovery
++
++---
++ mt7603/beacon.c  | 14 ++++++++++++--
++ mt7603/debugfs.c |  1 +
++ mt7603/mac.c     | 17 ++++++++++++++---
++ mt7603/mt7603.h  |  4 ++++
++ 4 files changed, 31 insertions(+), 5 deletions(-)
++
++diff --git a/mt7603/beacon.c b/mt7603/beacon.c
++index e09622ec..d9363ea3 100644
++--- a/mt7603/beacon.c
+++++ b/mt7603/beacon.c
++@@ -71,6 +71,8 @@ mt7603_update_beacon_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
++ 	mt76_tx_queue_skb(dev, dev->mphy.q_tx[MT_TXQ_BEACON],
++ 			  MT_TXQ_BEACON, skb, &mvif->sta.wcid, NULL);
++ 
+++	dev->bcast_queued = true;
+++
++ out:
++ 	spin_unlock_bh(&dev->ps_lock);
++ }
++@@ -127,6 +129,7 @@ void mt7603_pre_tbtt_tasklet(struct tasklet_struct *t)
++ 		dev->beacon_check = 0;
++ 	mt7603_mac_stuck_beacon_recovery(dev);
++ 
+++	dev->bcast_queued = false;
++ 	q = dev->mphy.q_tx[MT_TXQ_BEACON];
++ 	spin_lock(&q->lock);
++ 	ieee80211_iterate_active_interfaces_atomic(mt76_hw(dev),
++@@ -137,7 +140,7 @@ void mt7603_pre_tbtt_tasklet(struct tasklet_struct *t)
++ 
++ 	mt76_csa_check(mdev);
++ 	if (mdev->csa_complete)
++-		return;
+++		goto out;
++ 
++ 	q = dev->mphy.q_tx[MT_TXQ_CAB];
++ 	do {
++@@ -149,7 +152,7 @@ void mt7603_pre_tbtt_tasklet(struct tasklet_struct *t)
++ 		 skb_queue_len(&data.q) < 8);
++ 
++ 	if (skb_queue_empty(&data.q))
++-		return;
+++		goto out;
++ 
++ 	for (i = 0; i < ARRAY_SIZE(data.tail); i++) {
++ 		if (!data.tail[i])
++@@ -165,6 +168,7 @@ void mt7603_pre_tbtt_tasklet(struct tasklet_struct *t)
++ 		struct mt7603_vif *mvif = (struct mt7603_vif *)vif->drv_priv;
++ 
++ 		mt76_tx_queue_skb(dev, q, MT_TXQ_CAB, skb, &mvif->sta.wcid, NULL);
+++		dev->bcast_queued = true;
++ 	}
++ 	mt76_queue_kick(dev, q);
++ 	spin_unlock(&q->lock);
++@@ -177,6 +181,12 @@ void mt7603_pre_tbtt_tasklet(struct tasklet_struct *t)
++ 		MT_WF_ARB_CAB_START_BSSn(0) |
++ 		(MT_WF_ARB_CAB_START_BSS0n(1) *
++ 		 ((1 << (MT7603_MAX_INTERFACES - 1)) - 1)));
+++out:
+++	if (dev->bcast_queued)
+++		dev->bcast_check++;
+++
+++	if (dev->bcast_check >= MT7603_WATCHDOG_TIMEOUT)
+++		dev_warn(dev->mt76.dev, "Broadcast queue stuck %d times\n", dev->bcast_check);
++ }
++ 
++ void mt7603_beacon_set_timer(struct mt7603_dev *dev, int idx, int intval)
++diff --git a/mt7603/debugfs.c b/mt7603/debugfs.c
++index 34f04988..138b51cf 100644
++--- a/mt7603/debugfs.c
+++++ b/mt7603/debugfs.c
++@@ -12,6 +12,7 @@ mt7603_reset_read(struct seq_file *s, void *data)
++ 		[RESET_CAUSE_RX_BUSY] = "RX DMA busy stuck",
++ 		[RESET_CAUSE_RX_PSE_BUSY] = "RX PSE busy stuck",
++ 		[RESET_CAUSE_BEACON_STUCK] = "Beacon stuck",
+++		[RESET_CAUSE_BCAST_TXS_DEAD] = "Broadcast TXS dead",
++ 		[RESET_CAUSE_FQ_STUCK] = "FQ stuck",
++ 		[RESET_CAUSE_MCU_HANG] = "MCU hang",
++ 		[RESET_CAUSE_RESET_FAILED] = "PSE reset failed",
++diff --git a/mt7603/mac.c b/mt7603/mac.c
++index c034f0f7..ed4fb980 100644
++--- a/mt7603/mac.c
+++++ b/mt7603/mac.c
++@@ -1288,11 +1288,18 @@ void mt7603_mac_add_txs(struct mt7603_dev *dev, void *data)
++ 	pid = le32_get_bits(txs_data[4], MT_TXS4_PID);
++ 	wcidx = le32_get_bits(txs_data[3], MT_TXS3_WCID);
++ 
++-	if (pid == MT_PACKET_ID_NO_ACK)
++-		return;
++-
++ 	rcu_read_lock();
++ 
+++	if (pid == MT_PACKET_ID_NO_ACK) {
+++		/* Check if WCID is of a VIF */
+++		if (wcidx < MT7603_WTBL_STA)
+++			goto out;
+++
+++		/* Reset broadcast check */
+++		dev->bcast_check = 0;
+++		goto out;
+++	}
+++
++ 	wcid = mt76_wcid_ptr(dev, wcidx);
++ 	if (!wcid)
++ 		goto out;
++@@ -1483,6 +1490,7 @@ static void mt7603_mac_watchdog_reset(struct mt7603_dev *dev)
++ 	}
++ 
++ 	if (dev->reset_cause[RESET_CAUSE_RESET_FAILED] ||
+++	    dev->cur_reset_cause == RESET_CAUSE_BCAST_TXS_DEAD ||
++ 	    dev->cur_reset_cause == RESET_CAUSE_RX_PSE_BUSY)
++ 		mt7603_pse_reset(dev);
++ 
++@@ -1914,6 +1922,9 @@ void mt7603_mac_work(struct work_struct *work)
++ 	if (mt7603_watchdog_check(dev, &dev->rx_pse_check,
++ 				  RESET_CAUSE_RX_PSE_BUSY,
++ 				  mt7603_rx_pse_busy) ||
+++	    mt7603_watchdog_check(dev, &dev->bcast_check,
+++				  RESET_CAUSE_BCAST_TXS_DEAD,
+++				  NULL) ||
++ 	    mt7603_watchdog_check(dev, &dev->fq_check,
++ 				  RESET_CAUSE_FQ_STUCK,
++ 				  NULL) ||
++diff --git a/mt7603/mt7603.h b/mt7603/mt7603.h
++index 01748232..d6ef3cfa 100644
++--- a/mt7603/mt7603.h
+++++ b/mt7603/mt7603.h
++@@ -93,6 +93,7 @@ enum mt7603_reset_cause {
++ 	RESET_CAUSE_TX_HANG,
++ 	RESET_CAUSE_TX_BUSY,
++ 	RESET_CAUSE_RX_BUSY,
+++	RESET_CAUSE_BCAST_TXS_DEAD,
++ 	RESET_CAUSE_FQ_STUCK,
++ 	RESET_CAUSE_BEACON_STUCK,
++ 	RESET_CAUSE_RX_PSE_BUSY,
++@@ -142,8 +143,11 @@ struct mt7603_dev {
++ 	s8 sensitivity;
++ 	u8 sensitivity_limit;
++ 
+++	bool bcast_queued;
+++
++ 	u8 fq_check;
++ 	u8 beacon_check;
+++	u8 bcast_check;
++ 	u8 tx_hang_check;
++ 	u8 tx_dma_check;
++ 	u8 rx_dma_check;
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0007-wifi-mt76-mt7603-avoid-deadlock-on-failed-channel-co.patch b/package/kernel/mt76/patches/0007-wifi-mt76-mt7603-avoid-deadlock-on-failed-channel-co.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..e024fd570c3bbc09eeb0d66440ce4425b16ecfc5
+--- /dev/null
++++ b/package/kernel/mt76/patches/0007-wifi-mt76-mt7603-avoid-deadlock-on-failed-channel-co.patch
+@@ -0,0 +1,40 @@
++From c4a2b14dfc6b2f3dc968c3eff35c15d906731493 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 7 Sep 2026 01:10:38 +0200
++Subject: [PATCH 7/9] wifi: mt76: mt7603: avoid deadlock on failed channel
++ config
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/main.c | 8 ++------
++ 1 file changed, 2 insertions(+), 6 deletions(-)
++
++diff --git a/mt7603/main.c b/mt7603/main.c
++index fe80fcd6..b0c0fa91 100644
++--- a/mt7603/main.c
+++++ b/mt7603/main.c
++@@ -172,9 +172,6 @@ int mt7603_set_channel(struct mt76_phy *mphy)
++ 	mt7603_mac_set_timing(dev);
++ 	mt7603_mac_start(dev);
++ 
++-	ieee80211_queue_delayed_work(mt76_hw(dev), &dev->mphy.mac_work,
++-				     msecs_to_jiffies(MT7603_WATCHDOG_TIME));
++-
++ 	/* reset channel stats */
++ 	mt76_clear(dev, MT_MIB_CTL, MT_MIB_CTL_READ_CLR_DIS);
++ 	mt76_set(dev, MT_MIB_CTL,
++@@ -191,9 +188,8 @@ out:
++ 		mt7603_beacon_set_timer(dev, -1, dev->mt76.beacon_int);
++ 
++ 	tasklet_enable(&dev->mt76.pre_tbtt_tasklet);
++-
++-	if (failed)
++-		mt7603_mac_work(&dev->mphy.mac_work.work);
+++	ieee80211_queue_delayed_work(mt76_hw(dev), &dev->mphy.mac_work,
+++				     msecs_to_jiffies(MT7603_WATCHDOG_TIME));
++ 
++ 	return ret;
++ }
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0008-wifi-mt76-mt7603-avoid-sending-MCU-messages-on-pendi.patch b/package/kernel/mt76/patches/0008-wifi-mt76-mt7603-avoid-sending-MCU-messages-on-pendi.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad94f19bfe9d89836c1ce816cfd635d37c116af2
+--- /dev/null
++++ b/package/kernel/mt76/patches/0008-wifi-mt76-mt7603-avoid-sending-MCU-messages-on-pendi.patch
+@@ -0,0 +1,31 @@
++From 09f1fcc06d1b54a571c123862e8a0dca57f0ae29 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Mon, 7 Sep 2026 23:17:49 +0200
++Subject: [PATCH 8/9] wifi: mt76: mt7603: avoid sending MCU messages on pending
++ reset
++
++Abort sending messages to the MCU in case a MCU related reset is
++pending.
++
++Signed-off-by: David Bauer <mail@david-bauer.net>
++---
++ mt7603/mcu.c | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/mt7603/mcu.c b/mt7603/mcu.c
++index e432cce9..65c4d93e 100644
++--- a/mt7603/mcu.c
+++++ b/mt7603/mcu.c
++@@ -43,6 +43,9 @@ mt7603_mcu_skb_send_msg(struct mt76_dev *mdev, struct sk_buff *skb,
++ 	struct mt7603_mcu_txd *txd;
++ 	u8 seq;
++ 
+++	if (dev->mcu_hang)
+++		return -EIO;
+++
++ 	mdev->mcu.timeout = 3 * HZ;
++ 
++ 	seq = ++mdev->mcu.msg_seq & 0xf;
++-- 
++2.53.0
++
+diff --git a/package/kernel/mt76/patches/0009-Revert-wifi-mt76-mt7603-disable-PS-loopback.patch b/package/kernel/mt76/patches/0009-Revert-wifi-mt76-mt7603-disable-PS-loopback.patch
+new file mode 100644
+index 0000000000000000000000000000000000000000..d8fb40dc42e4bad6ac1745f813e9f23bf431f015
+--- /dev/null
++++ b/package/kernel/mt76/patches/0009-Revert-wifi-mt76-mt7603-disable-PS-loopback.patch
+@@ -0,0 +1,41 @@
++From 8333d7c67b124a17143085bda0e1fa6ba064ed49 Mon Sep 17 00:00:00 2001
++From: David Bauer <mail@david-bauer.net>
++Date: Fri, 2 Oct 2026 04:15:14 +0200
++Subject: [PATCH 9/9] Revert "wifi: mt76: mt7603: disable PS loopback"
++
++This reverts commit bd933f961b6d443f8c59fe23a6406a8715ec2454.
++---
++ mt7603/dma.c  | 2 +-
++ mt7603/main.c | 3 ---
++ 2 files changed, 1 insertion(+), 4 deletions(-)
++
++diff --git a/mt7603/dma.c b/mt7603/dma.c
++index a9cb688b..477a9b7a 100644
++--- a/mt7603/dma.c
+++++ b/mt7603/dma.c
++@@ -34,7 +34,7 @@ mt7603_rx_loopback_skb(struct mt7603_dev *dev, struct sk_buff *skb)
++ 	int idx;
++ 	u32 val;
++ 
++-	if (1 || skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
+++	if (skb->len < MT_TXD_SIZE + sizeof(struct ieee80211_hdr))
++ 		goto free;
++ 
++ 	val = le32_to_cpu(txd[1]);
++diff --git a/mt7603/main.c b/mt7603/main.c
++index b0c0fa91..25d40c2b 100644
++--- a/mt7603/main.c
+++++ b/mt7603/main.c
++@@ -405,9 +405,6 @@ mt7603_sta_ps(struct mt76_dev *mdev, struct ieee80211_sta *sta, bool ps)
++ 	struct mt7603_sta *msta = (struct mt7603_sta *)sta->drv_priv;
++ 	struct sk_buff_head list;
++ 
++-	if (1)
++-		return;
++-
++ 	mt76_stop_tx_queues(&dev->mphy, sta, true);
++ 	mt7603_wtbl_sta_ps(dev, msta, ps);
++ 	if (ps)
++-- 
++2.53.0
++
