@@ -52,7 +52,7 @@ jobs:
         run: contrib/actions/free-runner-space.sh
 
       - name: Build Docker container
-        run: docker build -t gluon-ci-container contrib/docker
+        run: docker build -t gluon-ci-container contrib/docker/gluon-build
 
       - name: Build Gluon
         run: docker run --rm -v $PWD:/gluon-ci -w /gluon-ci --user "$(id -u):$(id -g)" gluon-ci-container contrib/actions/run-build.sh ${{ matrix.target }}
