@@ -17,7 +17,7 @@ env:
 
 jobs:
   gluon-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     permissions: write-all
     steps:
       - name: Checkout repository
