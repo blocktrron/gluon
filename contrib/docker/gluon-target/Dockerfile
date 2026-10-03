@@ -9,5 +9,7 @@ RUN test -n "${GLUON_COMMIT}" \
 	&& test -n "${GLUON_TARGET}" \
 	&& git clone "${GLUON_REPO}" \
 	&& git -C gluon checkout "${GLUON_COMMIT}" \
+	&& ln -s docs/site-example gluon/site
 	&& make -C gluon update \
-	&& make -C gluon -j4 V=s GLUON_TARGET="${GLUON_TARGET}" toolchain
+	&& make -C gluon -j4 V=s GLUON_TARGET="${GLUON_TARGET}" toolchain \
+	&& rm gluon/site
