@@ -132,5 +132,6 @@ jobs:
             GLUON_BUILD_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
             GLUON_COMMIT=${{ github.sha }}
             GLUON_TARGET=${{ matrix.target }}
+            GLUON_REPO=https://github.com/blocktrron/gluon.git
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
