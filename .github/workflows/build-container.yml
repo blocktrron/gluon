@@ -117,11 +117,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302
         with:
-          images: ${{ env.REGISTRY }}/${{ matrix.target }}-${{ env.TARGET_IMAGE_NAME }}
+          images: blocktrron/gluon-target
           tags: |
-            type=raw,value=${{ github.sha }}
-            type=ref,event=branch,suffix=-${{ github.sha }}
-            type=ref,event=tag,suffix=-${{ github.sha }}
+            type=raw,value=${{ matrix.target }}-${{ github.sha }}
       - name: Build and push Docker image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
         with:
